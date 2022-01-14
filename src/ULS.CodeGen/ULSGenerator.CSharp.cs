@@ -88,7 +88,7 @@ namespace ULS.CodeGen
             StringBuilder sb = new StringBuilder();
             sb.AppendLine($"using System.ComponentModel;");
             sb.AppendLine($"using System.Text;");
-            sb.AppendLine($"using UnrealRemoteCoreLib;");
+            sb.AppendLine($"using ULS.Core;");
             sb.AppendLine($"");
             sb.AppendLine($"namespace {typeSymbol.ContainingNamespace.ToDisplayString()}");
             sb.AppendLine($"{{");
@@ -277,7 +277,7 @@ namespace ULS.CodeGen
         private string GenerateRpcEventWrapperFunction(INamedTypeSymbol typeSymbol, List<IEventSymbol> rpcEvents)
         {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine($"using UnrealRemoteCoreLib;");
+            sb.AppendLine($"using ULS.Core;");
             sb.AppendLine($"");
             sb.AppendLine($"namespace {typeSymbol.ContainingNamespace.ToDisplayString()}");
             sb.AppendLine($"{{");
@@ -306,7 +306,7 @@ namespace ULS.CodeGen
         {
             StringBuilder sb = new StringBuilder();
 
-            sb.AppendLine($"using UnrealRemoteCoreLib;");
+            sb.AppendLine($"using ULS.Core;");
             sb.AppendLine($"");
             sb.AppendLine($"namespace {typeSymbol.ContainingNamespace.ToDisplayString()}");
             sb.AppendLine($"{{");
@@ -400,7 +400,7 @@ namespace ULS.CodeGen
         private string GenerateSourceForMethods(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> items)
         {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine($"using UnrealRemoteCoreLib;");
+            sb.AppendLine($"using ULS.Core;");
             sb.AppendLine($"");
             sb.AppendLine($"namespace {typeSymbol.ContainingNamespace.ToDisplayString()}");
             sb.AppendLine($"{{");

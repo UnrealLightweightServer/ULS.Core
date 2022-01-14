@@ -48,7 +48,7 @@ namespace ULS.CodeGen
         private void GenerateCSharpClientEventHandlers(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> methods)
         {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine($"using UnrealRemoteCoreLib;");
+            sb.AppendLine($"using ULS.Core;");
             sb.AppendLine($"");
             sb.AppendLine($"namespace {typeSymbol.ContainingNamespace.ToDisplayString()}");
             sb.AppendLine($"{{");
@@ -143,7 +143,7 @@ namespace ULS.CodeGen
         private void GenerateCSharpClientEvents(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> events)
         {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine($"using UnrealRemoteCoreLib;");
+            sb.AppendLine($"using ULS.Core;");
             sb.AppendLine($"");
             sb.AppendLine($"namespace {typeSymbol.ContainingNamespace.ToDisplayString()}");
             sb.AppendLine($"{{");
