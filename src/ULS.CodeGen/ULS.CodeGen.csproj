@@ -1,9 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <LangVersion>10.0</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,10 +15,6 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.0.1" />
     <PackageReference Include="System.Text.Json" Version="5.0.0" GeneratePathProperty="true" PrivateAssets="all" />
     <PackageReference Include="System.Text.Encodings.Web" Version="5.0.0" GeneratePathProperty="true" PrivateAssets="all" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\ULS.Core\ULS.Core.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

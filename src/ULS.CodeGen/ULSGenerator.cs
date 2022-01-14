@@ -6,9 +6,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using ULS.Core;
 
 namespace ULS.CodeGen;
+
+public class UnrealProject
+{
+    public string ProjectName { get; set; } = string.Empty;
+
+    public string ProjectFile { get; set; } = string.Empty;
+
+    public string Module { get; set; } = string.Empty;
+
+    public bool IsCodeGenerationEnabled { get; set; } = true;
+}
 
 [Generator]
 public partial class ULSGenerator : ISourceGenerator
@@ -134,7 +144,7 @@ public partial class ULSGenerator : ISourceGenerator
     /// </summary>
     class SyntaxReceiver : ISyntaxContextReceiver
     {
-        public UnrealProjectAttribute UnrealProjectAttribute { get; set; } = null;
+        public UnrealProject UnrealProject { get; set; } = null;
 
         public List<INamedTypeSymbol> ReplicationMembersNotPartialTypes = new List<INamedTypeSymbol>();
         public Dictionary<INamedTypeSymbol, List<ISymbol>> ReplicationMembers = new Dictionary<INamedTypeSymbol, List<ISymbol>>();
@@ -254,7 +264,7 @@ public partial class ULSGenerator : ISourceGenerator
             {
                 if (attr.AttributeClass.ToDisplayString().EndsWith("UnrealProjectAttribute"))
                 {
-                    UnrealProjectAttribute = new UnrealProjectAttribute();
+                    UnrealProject = new UnrealProject();
 
                     foreach (var attrData in attr.ConstructorArguments)
                     {
@@ -265,16 +275,16 @@ public partial class ULSGenerator : ISourceGenerator
                         switch (attrData.Key)
                         {
                             case "IsCodeGenerationEnabled":
-                                UnrealProjectAttribute.IsCodeGenerationEnabled = (bool)attrData.Value.Value;
+                                UnrealProject.IsCodeGenerationEnabled = (bool)attrData.Value.Value;
                                 break;
                             case "ProjectName":
-                                UnrealProjectAttribute.ProjectName = (string)attrData.Value.Value;
+                                UnrealProject.ProjectName = (string)attrData.Value.Value;
                                 break;
                             case "ProjectFile":
-                                UnrealProjectAttribute.ProjectFile = (string)attrData.Value.Value;
+                                UnrealProject.ProjectFile = (string)attrData.Value.Value;
                                 break;
                             case "Module":
-                                UnrealProjectAttribute.Module = (string)attrData.Value.Value;
+                                UnrealProject.Module = (string)attrData.Value.Value;
                                 break;
                         }
                     }

@@ -347,7 +347,7 @@ namespace ULS.CodeGen
         #region Validation
         private bool ValidateUnrealProjectAttribute(GeneratorExecutionContext context, SyntaxReceiver receiver)
         {
-            if (receiver.UnrealProjectAttribute == null)
+            if (receiver.UnrealProject == null)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
                     Code_UnrealProjectAttribute, "", "At least one class must provide the UnrealProjectAttribute if code generation for Unreal is desired.",
@@ -356,7 +356,7 @@ namespace ULS.CodeGen
                 return false;
             }
 
-            if (receiver.UnrealProjectAttribute.IsCodeGenerationEnabled == false)
+            if (receiver.UnrealProject.IsCodeGenerationEnabled == false)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
                     Code_UnrealCodeSkip, "", "Skipping code generation for Unreal as defined in UnrealProjectAttribute.",
@@ -365,10 +365,10 @@ namespace ULS.CodeGen
                 return false;
             }
 
-            if (File.Exists(receiver.UnrealProjectAttribute.ProjectFile) == false)
+            if (File.Exists(receiver.UnrealProject.ProjectFile) == false)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                    Code_UnrealProjectFile, "", "Unreal project file at '" + receiver.UnrealProjectAttribute.ProjectFile + 
+                    Code_UnrealProjectFile, "", "Unreal project file at '" + receiver.UnrealProject.ProjectFile + 
                     "' does not exist or is not readable. Skipping code generation for Unreal.",
                     "", DiagnosticSeverity.Error, true),
                     null));
@@ -376,9 +376,9 @@ namespace ULS.CodeGen
             }
 
             UnrealModuleBaseDir = Path.Combine(
-                Path.GetDirectoryName(receiver.UnrealProjectAttribute.ProjectFile),
+                Path.GetDirectoryName(receiver.UnrealProject.ProjectFile),
                 "Source",
-                receiver.UnrealProjectAttribute.Module);
+                receiver.UnrealProject.Module);
 
             if (Directory.Exists(UnrealModuleBaseDir) == false)
             {
