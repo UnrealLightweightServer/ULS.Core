@@ -22,7 +22,7 @@ namespace ULS.Core
         /// <summary>
         /// Returns the network actor identified through the uniqueId
         /// </summary>
-        T GetNetworkActor<T>(long uniqueId) where T : NetworkActor;
+        T? GetNetworkActor<T>(long uniqueId) where T : NetworkActor;
 
         /// <summary>
         /// Creates and registers and new network actor. Always create network-aware actors using
