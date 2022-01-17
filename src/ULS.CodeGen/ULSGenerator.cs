@@ -1,11 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
 
 namespace ULS.CodeGen;
 
@@ -19,6 +14,92 @@ public class UnrealProject
 
     public bool IsCodeGenerationEnabled { get; set; } = true;
 }
+
+/*
+[Generator]
+public class ULSIncrementalGenerator : IIncrementalGenerator
+{
+    internal static string logFile = "D:\\Temp\\codegen_log_4.txt";
+
+    private static void Log(string text)
+    {
+        File.AppendAllText(logFile, text + Environment.NewLine);
+    }
+
+    public void Initialize(IncrementalGeneratorInitializationContext context)
+    {
+        Log("ULSIncrementalGenerator: Initialize");
+        context.RegisterPostInitializationOutput((ctx) =>
+        {
+            Log("ULSIncrementalGenerator: RegisterPostInitializationOutput");
+        });
+
+        IncrementalValuesProvider<CSharpSyntaxNode> assignments = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                predicate: static (node, _) => IsSyntaxNodeForGeneration(node),
+                transform: static (ctx, _) => GetTransform(ctx))
+            .Where(static m => m is AssignmentExpressionSyntax);
+
+        IncrementalValueProvider<(Compilation, ImmutableArray<CSharpSyntaxNode>)> compilationAndClasses =
+                context.CompilationProvider.Combine(assignments.Collect());
+
+        context.RegisterSourceOutput(compilationAndClasses, (ctx, src) =>
+        {
+            Log("ULSIncrementalGenerator: Execute 1: " + ctx);
+            Log("ULSIncrementalGenerator: Execute 2: " + src.Item1);
+            Log("ULSIncrementalGenerator: Execute 3: " + src.Item2);
+
+            var item = src.Item1;
+            item.Emit("d:\\Temp\\Program.exe");
+
+            Log("ULSIncrementalGenerator: Execute 4");
+        });
+    }
+
+    static bool IsSyntaxNodeForGeneration(SyntaxNode node)
+    {        
+        var res = node is AssignmentExpressionSyntax;
+        if (res)
+        {
+            Log("IsSyntaxNodeForGeneration: " + node);
+        }
+        return res;
+    }
+
+    static CSharpSyntaxNode GetTransform(GeneratorSyntaxContext ctx)
+    {
+        Log("GetTransform 1: " + ctx.Node);
+
+        var parent = ctx.Node.Parent as ExpressionStatementSyntax;
+        Log("GetTransform 2: " + parent);
+        if (parent == null)
+        {
+            return (CSharpSyntaxNode)ctx.Node;
+        }
+
+        BlockSyntax newNode = SyntaxFactory.Block()
+            .AddStatements(
+                parent,
+                SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.InvocationExpression(
+                    SyntaxFactory.MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        SyntaxFactory.IdentifierName("Console"),
+                        SyntaxFactory.IdentifierName("WriteLine")))
+                .WithArgumentList(
+                    SyntaxFactory.ArgumentList(
+                        SyntaxFactory.SingletonSeparatedList<ArgumentSyntax>(
+                            SyntaxFactory.Argument(
+                                SyntaxFactory.LiteralExpression(
+                                    SyntaxKind.StringLiteralExpression,
+                                    SyntaxFactory.Literal("Hello World")))))))
+                );
+
+        Log("GetTransform 3: " + newNode);
+        return (CSharpSyntaxNode)newNode;
+    }
+}
+*/
 
 [Generator]
 public partial class ULSGenerator : ISourceGenerator
@@ -89,7 +170,7 @@ public partial class ULSGenerator : ISourceGenerator
         {
             Log("ERROR Execute: " + ex);
         }
-    }        
+    }
 
     public void Initialize(GeneratorInitializationContext context)
     {
@@ -149,6 +230,8 @@ public partial class ULSGenerator : ISourceGenerator
         public List<INamedTypeSymbol> ReplicationMembersNotPartialTypes = new List<INamedTypeSymbol>();
         public Dictionary<INamedTypeSymbol, List<ISymbol>> ReplicationMembers = new Dictionary<INamedTypeSymbol, List<ISymbol>>();
 
+        public List<IFieldSymbol> ImmediateReplicationFields = new List<IFieldSymbol>();
+
         public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> RpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
         public Dictionary<INamedTypeSymbol, List<IEventSymbol>> RpcEventsByType { get; } = new Dictionary<INamedTypeSymbol, List<IEventSymbol>>();
         public Dictionary<IEventSymbol, string[]> RpcEventParameterNameLookup { get; } = new Dictionary<IEventSymbol, string[]>();
@@ -204,7 +287,7 @@ public partial class ULSGenerator : ISourceGenerator
         {
             foreach (var variable in fds.Declaration.Variables)
             {
-                var fs = context.SemanticModel.GetDeclaredSymbol(variable);
+                var fs = context.SemanticModel.GetDeclaredSymbol(variable) as IFieldSymbol;
                 foreach (var attr in fs.GetAttributes())
                 {
                     if (attr.AttributeClass.ToDisplayString().EndsWith("ReplicateAttribute"))
@@ -225,6 +308,22 @@ public partial class ULSGenerator : ISourceGenerator
                             ReplicationMembers[enclosingType] = list;
                         }
                         list.Add(fs);
+
+                        foreach (var attrData in attr.NamedArguments)
+                        {
+                            switch (attrData.Key)
+                            {
+                                case "ReplicationStrategy":
+                                    {
+                                        string strValue = attrData.Value.ToCSharpString();
+                                        if (strValue.EndsWith("Immediate"))
+                                        {
+                                            ImmediateReplicationFields.Add(fs);
+                                        }
+                                    }
+                                    break;
+                            }
+                        }
                     }
                 }
             }

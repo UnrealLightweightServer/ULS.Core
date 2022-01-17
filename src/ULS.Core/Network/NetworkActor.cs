@@ -17,12 +17,12 @@ namespace ULS.Core
         /// Unique network Id. Used to synchronize objects between the client and the server.
         /// Is only unique with regards to the current INetworkOwner
         /// </summary>
-        public long UniqueId { get; init; }
+        public long UniqueId { get; private set; }
 
         /// <summary>
         /// Public reference to the INetworkOwner
         /// </summary>
-        public INetworkOwner Owner { get; init; }
+        public INetworkOwner Owner { get; private set; }
 
         /// <summary>
         /// Do not call explicitly.

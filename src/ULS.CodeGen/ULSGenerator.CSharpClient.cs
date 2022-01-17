@@ -134,7 +134,7 @@ namespace ULS.CodeGen
             sb.AppendLine($"   }}");
             sb.AppendLine($"}}");
 
-            string fn = typeSymbol.ToDisplayString().Replace(".", "_") + "__client_methods.cs";
+            string fn = typeSymbol.ToDisplayString().Replace(".", "_") + "__client_methods.g.cs";
 
             string code = sb.ToString();
             context.AddSource(fn, code);
@@ -234,7 +234,7 @@ namespace ULS.CodeGen
             sb.AppendLine($"   }}");
             sb.AppendLine($"}}");
 
-            string fn = typeSymbol.ToDisplayString().Replace(".", "_") + "__client_events.cs";
+            string fn = typeSymbol.ToDisplayString().Replace(".", "_") + "__client_events.g.cs";
 
             string code = sb.ToString();
             context.AddSource(fn, code);

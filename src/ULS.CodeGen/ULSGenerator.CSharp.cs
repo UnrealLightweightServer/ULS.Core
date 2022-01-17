@@ -17,7 +17,7 @@ namespace ULS.CodeGen
             }
             foreach (var pair in receiver.ReplicationMembers)
             {
-                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__properties.cs";
+                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__properties.g.cs";
 
                 string code = GenerateSourceForReplicatedMembers(context, pair.Key, pair.Value);
                 if (code == null)
@@ -29,7 +29,7 @@ namespace ULS.CodeGen
 
             foreach (var pair in receiver.RpcMethodsByType)
             {
-                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__methods.cs";
+                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__methods.g.cs";
 
                 string code = GenerateSourceForMethods(context, pair.Key, pair.Value);
                 context.AddSource(fn, code);
@@ -37,14 +37,14 @@ namespace ULS.CodeGen
 
             foreach (var pair in receiver.RpcEventsByType)
             {
-                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__events_wrapperfunction.cs";
+                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__events_wrapperfunction.g.cs";
                 string code = GenerateRpcEventWrapperFunction(pair.Key, pair.Value);
                 context.AddSource(fn, code);
             }
 
             foreach (var pair in receiver.RpcEventsByType)
             {
-                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__events.cs";
+                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__events.g.cs";
 
                 string code = GenerateSourceForEvents(context, pair.Key, pair.Value);
                 context.AddSource(fn, code);
