@@ -3,16 +3,17 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using ULS.Core;
 
 namespace ULS.CodeGen
 {
     public partial class ULSGenerator
     {
-        private void GenerateCSharpClasses(GeneratorExecutionContext context, SyntaxReceiver receiver)
+        private bool GenerateCSharpClasses(GeneratorExecutionContext context, SyntaxReceiver receiver)
         {
             if (ValidateReplicationTypes(context, receiver) == false)
             {
-                return;
+                return false;
             }
             foreach (var pair in receiver.ReplicationMembers)
             {
@@ -48,6 +49,8 @@ namespace ULS.CodeGen
                 string code = GenerateSourceForEvents(context, pair.Key, pair.Value);
                 context.AddSource(fn, code);
             }
+
+            return true;
         }
 
         #region Replicated properties
@@ -66,15 +69,24 @@ namespace ULS.CodeGen
                 }
             }
 
-            if (receiver.ReplicationMembersNotPartialTypes.Count == 0)
+            if (receiver.ReplicationMembersNotPartialTypes.Count == 0 &&
+                receiver.ReplicationFieldsNotPrivate.Count == 0)
             {
                 return true;
+            }
+
+            foreach (var item in receiver.ReplicationFieldsNotPrivate)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                    Code_ReplicationTypeNotPrivate, "", "Replicated fields must be a field member, private and start with an underscore.",
+                    "", DiagnosticSeverity.Error, true),
+                    item.Locations.Length > 0 ? item.Locations[0] : null));
             }
 
             foreach (var item in receiver.ReplicationMembersNotPartialTypes)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                    Code_ReplicationTypeNotPartial, "", "Classes using Replicated properties or fields must be declared as partial.",
+                    Code_ReplicationTypeNotPartial, "", "Classes using Replicated fields must be declared as partial.",
                     "", DiagnosticSeverity.Error, true),
                     item.Locations.Length > 0 ? item.Locations[0] : null));
             }
@@ -82,113 +94,191 @@ namespace ULS.CodeGen
             return false;
         }
         
-        private string GenerateSourceForReplicatedMembers(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<ISymbol> members)
+        private string? GenerateSourceForReplicatedMembers(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IFieldSymbol> members)
         {
+            bool generateIfChangedCode = false;
+
             StringBuilder sb = new StringBuilder();
             sb.AppendLine($"using System.ComponentModel;");
             sb.AppendLine($"using System.Text;");
             sb.AppendLine($"using ULS.Core;");
             sb.AppendLine($"");
+            sb.AppendLine($"#nullable enable");
+            sb.AppendLine($"");
             sb.AppendLine($"namespace {typeSymbol.ContainingNamespace.ToDisplayString()}");
             sb.AppendLine($"{{");
             sb.AppendLine($"   partial class {typeSymbol.Name}");
             sb.AppendLine($"   {{");
-
-            foreach (var item in members)
+            foreach (var field in members)
             {
-                sb.AppendLine($"      [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]");
-                sb.AppendLine($"      [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]");
-                if (item is IPropertySymbol prop)
+                if (generateIfChangedCode)
                 {
-                    sb.AppendLine($"      private {prop.Type} {prop.Name}_replicationBackingField = {GetDefault(prop.Type, prop.Name)};");
-                    sb.AppendLine($"      public event Action? {prop.Name}_OnValueChanged;");
-                }
-                if (item is IFieldSymbol field)
-                {
+                    sb.AppendLine($"      [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]");
+                    sb.AppendLine($"      [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]");
                     sb.AppendLine($"      private {field.Type} {field.Name}_replicationBackingField = {GetDefault(field.Type, field.Name)};");
-                    sb.AppendLine($"      public event Action? {field.Name}_OnValueChanged;");
                 }
+                sb.AppendLine($"      public {field.Type} {GetReplicationFieldPublicName(field)}");
+                sb.AppendLine($"      {{");
+                sb.AppendLine($"         get {{ return {field.Name}; }}");
+                sb.AppendLine($"         set");
+                sb.AppendLine($"         {{");
+                sb.AppendLine($"            if ({field.Name} != value)");
+                sb.AppendLine($"            {{");
+                sb.AppendLine($"               {field.Name} = value;");
+                if (IsImmediateReplicationField(field))
+                {
+                    sb.AppendLine($"               // TODO: Optimize");
+                    sb.AppendLine($"               System.IO.MemoryStream ms = new System.IO.MemoryStream();");
+                    sb.AppendLine($"               System.IO.BinaryWriter writer = new System.IO.BinaryWriter(ms);");
+                    sb.AppendLine($"               writer.Write((int)0);");
+                    sb.AppendLine($"               writer.Write(UniqueId);");
+                    sb.AppendLine($"               writer.Write((int)1);");
+                    string ? serializeFunc = GetSerializeFunction(context, field);
+                    if (serializeFunc != null)
+                    {
+                        sb.AppendLine($"               {serializeFunc};");
+                    }                    
+                    sb.AppendLine($"               Owner.ReplicateValueDirect(ms.ToArray());"); 
+                }
+                sb.AppendLine($"            }}");
+                sb.AppendLine($"         }}");
+                sb.AppendLine($"      }}");
+                sb.AppendLine($"      public event Action? {GetReplicationFieldPublicName(field)}_OnValueChanged;");
                 sb.AppendLine($"      ");
             }            
             sb.AppendLine($"      protected override void ReplicateValuesInternal(BinaryWriter writer, bool forced, ref int numberOfSerializedFields)");
             sb.AppendLine($"      {{");
             sb.AppendLine($"         base.ReplicateValuesInternal(writer, forced, ref numberOfSerializedFields);");
-            foreach (var item in members)
+
+            foreach (var field in members)
             {
-                string serializeFunc = null;
-                if (item is IPropertySymbol prop)
+                string additionalIndent = string.Empty;
+                if (generateIfChangedCode)
                 {
-                    sb.AppendLine($"         if (forced || {prop.Name} != {prop.Name}_replicationBackingField)");
-                    sb.AppendLine($"         {{");
-                    sb.AppendLine($"            {prop.Name}_replicationBackingField = {prop.Name};");
-                    serializeFunc = GetSerializeFunction(context, prop.Type, prop.Name);
-                }
-                if (item is IFieldSymbol field)
-                {
+                    additionalIndent = "   ";
                     sb.AppendLine($"         if (forced || {field.Name} != {field.Name}_replicationBackingField)");
                     sb.AppendLine($"         {{");
                     sb.AppendLine($"            {field.Name}_replicationBackingField = {field.Name};");
-                    serializeFunc = GetSerializeFunction(context, field.Type, field.Name);
+                    
                 }
+                string? serializeFunc = GetSerializeFunction(context, field);
                 if (serializeFunc == null)
                 {
                     return null;
                 }
-                sb.AppendLine($"            {serializeFunc};");
-                sb.AppendLine($"            numberOfSerializedFields++;");
-                sb.AppendLine($"         }}");
+                sb.AppendLine($"         {additionalIndent}{serializeFunc};");
+                sb.AppendLine($"         {additionalIndent}numberOfSerializedFields++;");
+                if (generateIfChangedCode)
+                {
+                    sb.AppendLine($"         }}");
+                }
             }
             sb.AppendLine($"      }}");
             sb.AppendLine($"      ");
-            sb.AppendLine($"      public override void ApplyReplicatedValues(BinaryReader reader)");
+            sb.AppendLine($"      protected override void DeserializeFieldInternal(byte type, string fieldName, BinaryReader reader)");
             sb.AppendLine($"      {{");
-            sb.AppendLine($"         int fieldCount = reader.ReadInt32();");
-            sb.AppendLine($"         for (int i = 0; i < fieldCount; i++)");
-            sb.AppendLine($"         {{");
-            sb.AppendLine($"            byte type = reader.ReadByte();");
-            sb.AppendLine($"            string fieldName = Encoding.UTF8.GetString(reader.ReadBytes(reader.ReadInt32()));");
-            sb.AppendLine($"            switch (fieldName)");
-            sb.AppendLine($"            {{");
-            foreach (var item in members)
+            sb.AppendLine($"         base.DeserializeFieldInternal(type, fieldName, reader);");
+            foreach (var field in members)
             {
-                if (item is IPropertySymbol prop)
-                {
-                    sb.AppendLine($"               case \"{prop.Name}\":");
-                    sb.AppendLine($"                  {{");
-                    sb.AppendLine($"                     var newValue_{prop.Name} = {GetDeserializeFunction(context, prop.Type, prop.Name)};");
-                    sb.AppendLine($"                     if (newValue_{prop.Name} != {prop.Name})");
-                    sb.AppendLine($"                     {{");
-                    sb.AppendLine($"                        {prop.Name} = newValue_{prop.Name};");
-                    sb.AppendLine($"                        {prop.Name}_replicationBackingField = {prop.Name};");
-                    sb.AppendLine($"                        {prop.Name}_OnValueChanged?.Invoke();");
-                    sb.AppendLine($"                     }}");
-                    sb.AppendLine($"                  }}");
-                    sb.AppendLine($"                  break;");
-                }
-                if (item is IFieldSymbol field)
-                {
-                    sb.AppendLine($"               case \"{field.Name}\":");
-                    sb.AppendLine($"                  {{");
-                    sb.AppendLine($"                     var newValue_{field.Name} = {GetDeserializeFunction(context, field.Type, field.Name)};");
-                    sb.AppendLine($"                     if (newValue_{field.Name} != {field.Name})");
-                    sb.AppendLine($"                     {{");
-                    sb.AppendLine($"                        {field.Name} = newValue_{field.Name};");
-                    sb.AppendLine($"                        {field.Name}_replicationBackingField = {field.Name};");
-                    sb.AppendLine($"                        {field.Name}_OnValueChanged?.Invoke();");
-                    sb.AppendLine($"                     }}");
-                    sb.AppendLine($"                  }}");
-                    sb.AppendLine($"                  break;");
-                }
+                sb.AppendLine($"         bool value_{field.Name}_changed = false;");
             }
-            sb.AppendLine($"            }}");
+            sb.AppendLine($"         switch (fieldName)");
+            sb.AppendLine($"         {{");
+            foreach (var field in members)
+            {
+                sb.AppendLine($"            case \"{GetReplicationFieldReplicationName(field)}\":");
+                sb.AppendLine($"               {{");
+                sb.AppendLine($"                  var newValue_{field.Name} = {GetDeserializeFunction(context, field)};");
+                sb.AppendLine($"                  value_{field.Name}_changed = (newValue_{field.Name} != {field.Name});");
+                sb.AppendLine($"                  if (value_{field.Name}_changed)");
+                sb.AppendLine($"                  {{");
+                sb.AppendLine($"                     {field.Name} = newValue_{field.Name};");
+                if (generateIfChangedCode)
+                {
+                    sb.AppendLine($"                     {field.Name}_replicationBackingField = {field.Name};");
+                }
+                sb.AppendLine($"                  }}");
+                sb.AppendLine($"               }}");
+                sb.AppendLine($"               break;");
+                sb.AppendLine();
+            }
             sb.AppendLine($"         }}");
+            foreach (var field in members)
+            {
+                sb.AppendLine($"         if (value_{field.Name}_changed)");
+                sb.AppendLine($"         {{");
+                sb.AppendLine($"            {GetReplicationFieldPublicName(field)}_OnValueChanged?.Invoke();");
+                sb.AppendLine($"         }}");
+            }
             sb.AppendLine($"      }}");
             sb.AppendLine($"   }}");
             sb.AppendLine($"}}");
             return sb.ToString();
         }
 
-        private string GetDefault(ITypeSymbol symbolType, string symbolName)
+        private static bool IsImmediateReplicationField(IFieldSymbol field)
+        {
+            var defAttrib = new ReplicateAttribute();
+            bool isImmediate = false;
+            if (defAttrib.ReplicationStrategy == ReplicationStrategy.Immediate)
+            {
+                isImmediate = true;
+            }
+            if (defAttrib.ReplicationStrategy == ReplicationStrategy.Automatic)
+            {
+                isImmediate = IsNetworkActor(field.Type);
+            }
+            var attribs = field.GetAttributes();
+            foreach (var attr in attribs)
+            {
+                if (attr.AttributeClass != null &&
+                    attr.AttributeClass.ToDisplayString().EndsWith("ReplicateAttribute"))
+                {
+                    foreach (var attrData in attr.NamedArguments)
+                    {
+                        switch (attrData.Key)
+                        {
+                            case "ReplicationStrategy":
+                                {
+                                    var strat = (ReplicationStrategy)attrData.Value.Value;
+                                    switch (strat)
+                                    {
+                                        case ReplicationStrategy.Automatic:
+                                            isImmediate = IsNetworkActor(field.Type);
+                                            break;
+                                        case ReplicationStrategy.Manual:
+                                            isImmediate = false;
+                                            break;
+                                        case ReplicationStrategy.Immediate:
+                                            isImmediate = true;
+                                            break;
+                                    }
+                                }
+                                break;
+                        }
+                    }
+                }
+            }
+            return isImmediate;
+        }
+
+        /// <summary>
+        /// Returns the name of the field that should be placed into the serialization packet
+        /// (as expected by the receiving end)
+        /// </summary>
+        private static string GetReplicationFieldReplicationName(IFieldSymbol field)
+        {
+            var str = field.Name.Substring(1);
+            return char.ToUpperInvariant(str[0]) + str.Substring(1);
+        }
+
+        private static string GetReplicationFieldPublicName(IFieldSymbol field)
+        {
+            var str = field.Name.Substring(1);
+            return char.ToUpperInvariant(str[0]) + str.Substring(1);
+        }
+
+        private static string GetDefault(ITypeSymbol symbolType, string symbolName)
         {
             switch (symbolType.ToString())
             {
@@ -200,9 +290,12 @@ namespace ULS.CodeGen
 
                 case "string":
                     return $"string.Empty";
+
+                case "System.Numerics.Vector3":
+                    return "System.Numerics.Vector3.Zero";
             }
 
-            if (IsSubclassOf(symbolType, "NetworkActor"))
+            if (IsNetworkActor(symbolType))
             {
                 return $"null";
             }
@@ -210,10 +303,12 @@ namespace ULS.CodeGen
             return $"default({symbolType})";
         }
 
-        private string GetDeserializeFunction(GeneratorExecutionContext context, ITypeSymbol symbolType, string symbolName)
+        private static string? GetDeserializeFunction(GeneratorExecutionContext context, IFieldSymbol field)
         {
+            ITypeSymbol symbolType = field.Type;
             switch (symbolType.ToString())
             {
+                case "short":
                 case "int":
                 case "long":
                 case "float":
@@ -222,9 +317,12 @@ namespace ULS.CodeGen
 
                 case "string":
                     return $"DeserializeString(reader)";
+
+                case "System.Numerics.Vector3":
+                    return $"DeserializeVector3(reader)";
             }
 
-            if (IsSubclassOf(symbolType, "NetworkActor"))
+            if (IsNetworkActor(symbolType))
             {
                 var symbolTypeString = symbolType.ToString();
                 if (symbolTypeString.EndsWith("?"))
@@ -235,18 +333,20 @@ namespace ULS.CodeGen
             }
 
             context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                Code_ReplicationInvalidPropertyType, "", "Classes using Replicated properties must be derived from NetworkActor" + 
-                $" (Class: {symbolType.ToDisplayString()})",
+                Code_ReplicationInvalidPropertyType, "", $"Type (Class: {symbolType.ToDisplayString()}) is not supported by replication",
                 "", DiagnosticSeverity.Error, true),
-                symbolType.Locations.Length > 0 ? symbolType.Locations[0] : null));
+                field.Locations.Length > 0 ? field.Locations[0] : null));
 
             return null;
         }
 
-        private string GetSerializeFunction(GeneratorExecutionContext context, ITypeSymbol symbolType, string symbolName)
+        private static string? GetSerializeFunction(GeneratorExecutionContext context, IFieldSymbol field)
         {
+            ITypeSymbol symbolType = field.Type;
+            string symbolName = GetReplicationFieldReplicationName(field);
             switch (symbolType.ToString())
             {
+                case "short":
                 case "int":
                 case "long":
                 case "float":
@@ -255,6 +355,9 @@ namespace ULS.CodeGen
 
                 case "string":
                     return $"SerializeString(writer, {symbolName}, \"{symbolName}\")";
+
+                case "System.Numerics.Vector3":
+                    return $"SerializeVector3(writer, {symbolName}, \"{symbolName}\")";
             }
 
             if (IsSubclassOf(symbolType, "NetworkActor"))
@@ -263,10 +366,9 @@ namespace ULS.CodeGen
             }
 
             context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                Code_ReplicationInvalidPropertyType, "", "Classes using Replicated properties must be derived from NetworkActor" +
-                $" (Class: {symbolType.ToDisplayString()})",
+                Code_ReplicationInvalidPropertyType, "", $"Type (Class: {symbolType.ToDisplayString()}) is not supported by replication",
                 "", DiagnosticSeverity.Error, true),
-                symbolType.Locations.Length > 0 ? symbolType.Locations[0] : null));
+                field.Locations.Length > 0 ? field.Locations[0] : null));
             
             return null;
         }

@@ -30,6 +30,7 @@ public partial class ULSGenerator : ISourceGenerator
     internal const string Code_ReplicationTypeNetworkActor = "UR0011";
     internal const string Code_ReplicationTypeNotPartial = "UR0012";
     internal const string Code_ReplicationInvalidPropertyType = "UR0013";
+    internal const string Code_ReplicationTypeNotPrivate = "UR0014";
 
     internal const string Code_InvalidParam = "UR0020";
 
@@ -69,7 +70,10 @@ public partial class ULSGenerator : ISourceGenerator
             }
 
             Log("BEGIN Execute C#");
-            GenerateCSharpClasses(context, receiver);
+            if (GenerateCSharpClasses(context, receiver) == false)
+            {
+                return;
+            }
             Log("END Execute C#");
 
             Log("BEGIN Execute Unreal");
@@ -101,7 +105,7 @@ public partial class ULSGenerator : ISourceGenerator
         }
     }
 
-    private bool IsSubclassOf(ITypeSymbol typeSymbol, string name)
+    private static bool IsSubclassOf(ITypeSymbol typeSymbol, string name)
     {
         var parent = typeSymbol.BaseType;
         if (parent == null)
@@ -115,7 +119,7 @@ public partial class ULSGenerator : ISourceGenerator
         return IsSubclassOf(parent, name);
     }
 
-    private bool IsNetworkActor(ITypeSymbol typeSymbol)
+    private static bool IsNetworkActor(ITypeSymbol typeSymbol)
     {
         if (typeSymbol.Name == "NetworkActor")
         {
@@ -141,10 +145,12 @@ public partial class ULSGenerator : ISourceGenerator
     {
         public UnrealProject UnrealProject { get; set; } = null;
 
+        #region Error cases
+        public List<IFieldSymbol> ReplicationFieldsNotPrivate = new List<IFieldSymbol>();
         public List<INamedTypeSymbol> ReplicationMembersNotPartialTypes = new List<INamedTypeSymbol>();
-        public Dictionary<INamedTypeSymbol, List<ISymbol>> ReplicationMembers = new Dictionary<INamedTypeSymbol, List<ISymbol>>();
+        #endregion
 
-        public List<IFieldSymbol> ImmediateReplicationFields = new List<IFieldSymbol>();
+        public Dictionary<INamedTypeSymbol, List<IFieldSymbol>> ReplicationMembers = new Dictionary<INamedTypeSymbol, List<IFieldSymbol>>();
 
         public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> RpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
         public Dictionary<INamedTypeSymbol, List<IEventSymbol>> RpcEventsByType { get; } = new Dictionary<INamedTypeSymbol, List<IEventSymbol>>();
@@ -179,12 +185,6 @@ public partial class ULSGenerator : ISourceGenerator
                     HandleEvent(context, eds);
                 }
 
-                if (context.Node is PropertyDeclarationSyntax pds &&
-                    pds.AttributeLists.Count > 0)
-                {
-                    HandleProperty(context, pds);
-                }
-
                 if (context.Node is FieldDeclarationSyntax fds &&
                     fds.AttributeLists.Count > 0)
                 {
@@ -202,70 +202,47 @@ public partial class ULSGenerator : ISourceGenerator
             foreach (var variable in fds.Declaration.Variables)
             {
                 var fs = context.SemanticModel.GetDeclaredSymbol(variable) as IFieldSymbol;
+                if (fs == null)
+                {
+                    return;
+                }
+                if (fs.DeclaredAccessibility != Accessibility.Private)
+                {                    
+                    ReplicationFieldsNotPrivate.Add(fs);
+                    return;
+                }
+                if (fs.Name == null ||
+                    fs.Name.StartsWith("_") == false)
+                {
+                    ReplicationFieldsNotPrivate.Add(fs);
+                    return;
+                }
                 foreach (var attr in fs.GetAttributes())
                 {
-                    if (attr.AttributeClass.ToDisplayString().EndsWith("ReplicateAttribute"))
+                    if (attr.AttributeClass != null &&
+                        attr.AttributeClass.ToDisplayString().EndsWith("ReplicateAttribute"))
                     {
                         INamedTypeSymbol enclosingType = fs.ContainingType;
 
                         var typeDecl = fds.Parent as TypeDeclarationSyntax;
+                        if (typeDecl == null)
+                        {
+                            continue;
+                        }
                         if (typeDecl.Modifiers.All(x => x.Text != "partial"))
                         {
                             ReplicationMembersNotPartialTypes.Add(enclosingType);
                             return;
                         }
 
-                        List<ISymbol> list;
+                        List<IFieldSymbol> list;
                         if (ReplicationMembers.TryGetValue(enclosingType, out list) == false)
                         {
-                            list = new List<ISymbol>();
+                            list = new List<IFieldSymbol>();
                             ReplicationMembers[enclosingType] = list;
                         }
                         list.Add(fs);
-
-                        foreach (var attrData in attr.NamedArguments)
-                        {
-                            switch (attrData.Key)
-                            {
-                                case "ReplicationStrategy":
-                                    {
-                                        string strValue = attrData.Value.ToCSharpString();
-                                        if (strValue.EndsWith("Immediate"))
-                                        {
-                                            ImmediateReplicationFields.Add(fs);
-                                        }
-                                    }
-                                    break;
-                            }
-                        }
                     }
-                }
-            }
-        }
-
-        private void HandleProperty(GeneratorSyntaxContext context, PropertyDeclarationSyntax pds)
-        {
-            var ps = context.SemanticModel.GetDeclaredSymbol(pds) as IPropertySymbol;
-            foreach (var attr in ps.GetAttributes())
-            {
-                if (attr.AttributeClass.ToDisplayString().EndsWith("ReplicateAttribute"))
-                {
-                    INamedTypeSymbol enclosingType = ps.ContainingType;
-
-                    var typeDecl = pds.Parent as TypeDeclarationSyntax;
-                    if (typeDecl.Modifiers.All(x => x.Text != "partial"))
-                    {
-                        ReplicationMembersNotPartialTypes.Add(enclosingType);
-                        return;
-                    }
-
-                    List<ISymbol> list;
-                    if (ReplicationMembers.TryGetValue(enclosingType, out list) == false)
-                    {
-                        list = new List<ISymbol>();
-                        ReplicationMembers[enclosingType] = list;
-                    }
-                    list.Add(ps);
                 }
             }
         }
@@ -273,9 +250,14 @@ public partial class ULSGenerator : ISourceGenerator
         private void HandleClass(GeneratorSyntaxContext context, ClassDeclarationSyntax cds)
         {
             var ts = context.SemanticModel.GetDeclaredSymbol(cds) as INamedTypeSymbol;
+            if (ts == null)
+            {
+                return;
+            }
             foreach (var attr in ts.GetAttributes())
             {
-                if (attr.AttributeClass.ToDisplayString().EndsWith("UnrealProjectAttribute"))
+                if (attr.AttributeClass != null &&
+                    attr.AttributeClass.ToDisplayString().EndsWith("UnrealProjectAttribute"))
                 {
                     UnrealProject = new UnrealProject();
 
@@ -303,15 +285,16 @@ public partial class ULSGenerator : ISourceGenerator
                     }
                 }
 
-                if (attr.AttributeClass.ToDisplayString().EndsWith("UnrealClassAttribute"))
+                if (attr.AttributeClass != null &&
+                    attr.AttributeClass.ToDisplayString().EndsWith("UnrealClassAttribute"))
                 {
-                    string unrealClass = null;
+                    string? unrealClass = null;
                     foreach (var attrData in attr.NamedArguments)
                     {
                         switch (attrData.Key)
                         {
                             case "ClassName":
-                                unrealClass = (string)attrData.Value.Value;
+                                unrealClass = (string?)attrData.Value.Value;
                                 break;
                         }
                     }
@@ -342,7 +325,8 @@ public partial class ULSGenerator : ISourceGenerator
                 {
                     foreach (var attr in es.GetAttributes())
                     {
-                        if (attr.AttributeClass.ToDisplayString().EndsWith("RpcCallAttribute"))
+                        if (attr.AttributeClass != null &&
+                            attr.AttributeClass.ToDisplayString().EndsWith("RpcCallAttribute"))
                         {
                             foreach (var attrData in attr.NamedArguments)
                             {
@@ -382,7 +366,8 @@ public partial class ULSGenerator : ISourceGenerator
             var ms = context.SemanticModel.GetDeclaredSymbol(mds) as IMethodSymbol;
             foreach (var attr in ms.GetAttributes())
             {
-                if (attr.AttributeClass.ToDisplayString().EndsWith("RpcCallAttribute"))
+                if (attr.AttributeClass != null &&
+                    attr.AttributeClass.ToDisplayString().EndsWith("RpcCallAttribute"))
                 {
                     List<IMethodSymbol> list;
                     if (RpcMethodsByType.TryGetValue(ms.ContainingType, out list) == false)

@@ -37,6 +37,12 @@ namespace ULS.Core
         void DespawnNetworkActor<T>(T actor) where T : NetworkActor;
 
         /// <summary>
+        /// Directly replicate the content to the client.
+        /// Wrap the byte array into a replication packet.
+        /// </summary>
+        void ReplicateValueDirect(byte[] replicationData);
+
+        /// <summary>
         /// Used to manually invoke a member replication. Should not be called by external
         /// code unless the ReplicationStrategy is set to manual.
         /// </summary>

@@ -12,11 +12,11 @@ namespace ULS.Core
     }
 
     /// <summary>
-    /// Marks a class member as replicated.
+    /// Marks a class field as replicated.
     /// The C# source generator will generate the appropriate code to send changes
     /// over the network.
     /// </summary>
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+    [AttributeUsage(AttributeTargets.Field)]
     public class ReplicateAttribute : Attribute
     {
         /// <summary>

@@ -7,6 +7,14 @@ using ULS.Core;
 
 namespace ULS.Core
 {
+    public enum ReplicatedFieldType : byte
+    {
+        Reference = 0,
+        Primitive = 1,
+        String = 2,
+        Vector3 = 3
+    }
+
     /// <summary>
     /// Base class for all network-aware objects.
     /// Replication and RPC calls will only work if the class is derived from NetworkActor
@@ -78,14 +86,25 @@ namespace ULS.Core
             // Base implementation does nothing
         }
 
-        public virtual void ApplyReplicatedValues(BinaryReader reader)
+        public void ApplyReplicatedValues(BinaryReader reader)
         {
-            // Base implementation does nothing
+            int fieldCount = reader.ReadInt32();
+            for (int i = 0; i < fieldCount; i++)
+            {
+                byte type = reader.ReadByte();
+                string fieldName = Encoding.UTF8.GetString(reader.ReadBytes(reader.ReadInt32()));
+                DeserializeFieldInternal(type, fieldName, reader);
+            }
+        }
+
+        protected virtual void DeserializeFieldInternal(byte type, string fieldName, BinaryReader reader)
+        {
+            // Base implementation does nothing            
         }
 
         protected void SerializeRef(BinaryWriter writer, NetworkActor otherActor, string fieldName)
         {
-            writer.Write((byte)0);      // Ref
+            writer.Write((byte)ReplicatedFieldType.Reference);      // Ref
             writer.Write(Encoding.ASCII.GetByteCount(fieldName));
             writer.Write(Encoding.ASCII.GetBytes(fieldName));
             if (otherActor == null)
@@ -110,7 +129,7 @@ namespace ULS.Core
 
         protected void SerializeValue<T>(BinaryWriter writer, T value, string fieldName) where T : struct
         {
-            writer.Write((byte)1);      // Value
+            writer.Write((byte)ReplicatedFieldType.Primitive);      // Value
             writer.Write(Encoding.ASCII.GetByteCount(fieldName));
             writer.Write(Encoding.ASCII.GetBytes(fieldName));            
             int size = Marshal.SizeOf(value);
@@ -144,7 +163,7 @@ namespace ULS.Core
 
         protected void SerializeString(BinaryWriter writer, string value, string fieldName)
         {
-            writer.Write((byte)2);      // String
+            writer.Write((byte)ReplicatedFieldType.String);      // String
             writer.Write(Encoding.ASCII.GetByteCount(fieldName));
             writer.Write(Encoding.ASCII.GetBytes(fieldName));
             writer.Write(Encoding.UTF8.GetByteCount(value));
@@ -154,6 +173,24 @@ namespace ULS.Core
         protected string DeserializeString(BinaryReader reader)
         {
             return Encoding.UTF8.GetString(reader.ReadBytes(reader.ReadInt32()));
+        }
+
+        protected void SerializeVector3(BinaryWriter writer, System.Numerics.Vector3 value, string fieldName)
+        {
+            writer.Write((byte)ReplicatedFieldType.Vector3);
+            writer.Write(Encoding.ASCII.GetByteCount(fieldName));
+            writer.Write(Encoding.ASCII.GetBytes(fieldName));
+            writer.Write(value.X);
+            writer.Write(value.Y);
+            writer.Write(value.Z);
+        }
+
+        protected System.Numerics.Vector3 DeserializeVector3(BinaryReader reader)
+        {
+            return new System.Numerics.Vector3(
+                reader.ReadSingle(),
+                reader.ReadSingle(),
+                reader.ReadSingle());
         }
     }
 }
