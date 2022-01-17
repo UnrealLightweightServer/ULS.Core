@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using ULS.Core;
 
@@ -45,16 +44,16 @@ namespace ULS.Core
 
         public WirePacket GetWirePacket()
         {
-            byte[] data = JsonSerializer.SerializeToUtf8Bytes(this);
+            byte[] data = null;// JsonSerializer.SerializeToUtf8Bytes(this);
             return new WirePacket(WirePacketType.Rpc, data);
         }
 
         public static RpcPayload? FromJsonBytes(byte[] data)
         {
-            return JsonSerializer.Deserialize<RpcPayload>(data, new JsonSerializerOptions()
+            return null;/* JsonSerializer.Deserialize<RpcPayload>(data, new JsonSerializerOptions()
             {
                 PropertyNameCaseInsensitive = true
-            });
+            });*/
         }
 
         public T? Get<T>(string id, out bool found) where T : struct
@@ -68,10 +67,10 @@ namespace ULS.Core
                     parameter.Value != null)
                 {
                     found = true;
-                    return JsonSerializer.Deserialize<T>((string)parameter.Value, new JsonSerializerOptions()
+                    /*return JsonSerializer.Deserialize<T>((string)parameter.Value, new JsonSerializerOptions()
                     {
                         IncludeFields = true,
-                    });
+                    });*/
                 }
             }
             return default(T?);
@@ -91,7 +90,7 @@ namespace ULS.Core
                     {
                         case RpcParameterType.Int:
                             found = true;
-                            return ((JsonElement)parameter.Value).GetInt32();
+                            return 0;// ((JsonElement)parameter.Value).GetInt32();
 
                         default:
                             return 0;
@@ -115,7 +114,7 @@ namespace ULS.Core
                     {
                         case RpcParameterType.Long:
                             found = true;
-                            return ((JsonElement)parameter.Value).GetInt64();
+                            return 0;// ((JsonElement)parameter.Value).GetInt64();
 
                         default:
                             return 0;
@@ -139,7 +138,7 @@ namespace ULS.Core
                     {
                         case RpcParameterType.Object:
                             found = true;
-                            return ((JsonElement)parameter.Value).GetInt64();
+                            return 0;// ((JsonElement)parameter.Value).GetInt64();
 
                         default:
                             return 0;
@@ -163,7 +162,7 @@ namespace ULS.Core
                     {
                         case RpcParameterType.Float:
                             found = true;
-                            return ((JsonElement)parameter.Value).GetSingle();
+                            return 0;// ((JsonElement)parameter.Value).GetSingle();
 
                         default:
                             return 0;
@@ -187,7 +186,7 @@ namespace ULS.Core
                     {
                         case RpcParameterType.String:
                             found = true;
-                            return ((JsonElement)parameter.Value).GetString();
+                            return null;// ((JsonElement)parameter.Value).GetString();
 
                         default:
                             return string.Empty;
@@ -202,10 +201,10 @@ namespace ULS.Core
             Parameters.Add(new RpcParameter()
             {
                 Name = id,
-                Value = JsonSerializer.Serialize<T>(value, new JsonSerializerOptions()
+                /*Value = JsonSerializer.Serialize<T>(value, new JsonSerializerOptions()
                 {
                     IncludeFields = true,
-                }),
+                }),*/
                 Type = RpcParameterType.Object
             });
         }
@@ -214,20 +213,20 @@ namespace ULS.Core
         {
             if (ReturnValue is string strVal)
             {
-                return JsonSerializer.Deserialize<T>(strVal, new JsonSerializerOptions()
+                /*return JsonSerializer.Deserialize<T>(strVal, new JsonSerializerOptions()
                 {
                     IncludeFields = true,
-                });
+                });*/
             }
             return default(T);
         }
 
         public void SetReturnValue<T>(T value)
         {
-            ReturnValue = JsonSerializer.Serialize<T>(value, new JsonSerializerOptions()
+            /*ReturnValue = JsonSerializer.Serialize<T>(value, new JsonSerializerOptions()
             {
                 IncludeFields = true,
-            });
+            });*/
         }
     }
 }
