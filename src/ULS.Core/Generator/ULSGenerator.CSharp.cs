@@ -15,11 +15,16 @@ namespace ULS.CodeGen
             {
                 return false;
             }
+            if (ValidateRpcCallTypes(context, receiver) == false)
+            {
+                return false;
+            }
+
             foreach (var pair in receiver.ReplicationMembers)
             {
                 string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__properties.g.cs";
 
-                string code = GenerateSourceForReplicatedMembers(context, pair.Key, pair.Value);
+                string? code = GenerateSourceForReplicatedMembers(context, pair.Key, pair.Value);
                 if (code == null)
                 {
                     continue;
@@ -138,7 +143,7 @@ namespace ULS.CodeGen
                     {
                         sb.AppendLine($"               {serializeFunc};");
                     }                    
-                    sb.AppendLine($"               Owner.ReplicateValueDirect(ms.ToArray());"); 
+                    sb.AppendLine($"               Owner.ReplicateValueDirect(this, ms.ToArray());"); 
                 }
                 sb.AppendLine($"            }}");
                 sb.AppendLine($"         }}");
@@ -498,9 +503,37 @@ namespace ULS.CodeGen
         #endregion
 
         #region RPC calls
+        private bool ValidateRpcCallTypes(GeneratorExecutionContext context, SyntaxReceiver receiver)
+        {
+            if (receiver.RpcCallsNoNetworkActor.Count == 0 &&
+                receiver.RpcCallNotPartialTypes.Count == 0)
+            {
+                return true;
+            }
+
+            foreach (var item in receiver.ReplicationFieldsNotPrivate)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                    Code_RpcCallNoNetworkActor, "", "RpcCalls can only be used in classes derived from NetworkActor",
+                    "", DiagnosticSeverity.Error, true),
+                    item.Locations.Length > 0 ? item.Locations[0] : null));
+            }
+
+            foreach (var item in receiver.RpcCallNotPartialTypes)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                    Code_RpcCallNotPartialType, "", "Classes using RpcCalls must be declared as partial",
+                    "", DiagnosticSeverity.Error, true),
+                    item.Locations.Length > 0 ? item.Locations[0] : null));
+            }            
+
+            return false;
+        }
+
         private string GenerateSourceForMethods(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> items)
         {
             StringBuilder sb = new StringBuilder();
+            sb.AppendLine($"using System.Text;");
             sb.AppendLine($"using ULS.Core;");
             sb.AppendLine($"");
             sb.AppendLine($"namespace {typeSymbol.ContainingNamespace.ToDisplayString()}");
@@ -520,25 +553,17 @@ namespace ULS.CodeGen
                     paramString += item.Parameters[i].Type.ToDisplayString() + " " + item.Parameters[i].Name;
                 }
 
-                bool isBroadcast = true;
-                foreach (var attr in item.GetAttributes())
-                {
-                    foreach (var args in attr.NamedArguments)
-                    {
-                        if (args.Key == "IsBroadcast")
-                        {
-                            isBroadcast = (bool)args.Value.Value;
-                        }
-                    }
-                }
-
                 sb.AppendLine($"      public partial {GetReturnType(item)} {item.Name}({paramString})");
                 sb.AppendLine($"      {{");
-                sb.AppendLine($"         RpcPayload payload = new RpcPayload();");
-                sb.AppendLine($"         payload.MethodName = \"{item.Name}\";");
-                sb.AppendLine($"         payload.ReturnType = \"{GetReturnType(item)}\";");
-                sb.AppendLine($"         payload.ReturnValue = string.Empty;");
-                for (int i = 0; i < item.Parameters.Length; i++)
+                sb.AppendLine($"         MemoryStream ms = new MemoryStream();");
+                sb.AppendLine($"         BinaryWriter writer = new BinaryWriter(ms);");
+                sb.AppendLine($"         writer.Write((int)0);              // flags");
+                sb.AppendLine($"         writer.Write(this.UniqueId);");
+                sb.AppendLine($"         writer.Write(Encoding.ASCII.GetByteCount(\"{item.Name}\"));");
+                sb.AppendLine($"         writer.Write(Encoding.ASCII.GetBytes(\"{item.Name}\"));");
+                sb.AppendLine($"         writer.Write(Encoding.ASCII.GetByteCount(\"{GetReturnType(item)}\"));");
+                sb.AppendLine($"         writer.Write(Encoding.ASCII.GetBytes(\"{GetReturnType(item)}\"));");
+                /*for (int i = 0; i < item.Parameters.Length; i++)
                 {
                     var parameter = item.Parameters[i];
 
@@ -582,14 +607,8 @@ namespace ULS.CodeGen
                     }
                     sb.AppendLine($"         }});");
                 }
-                if (isBroadcast == false)
-                {
-                    sb.AppendLine($"         SendRpc(payload.GetWirePacket());");
-                }
-                else
-                {
-                    sb.AppendLine($"         BroadcastRpc(payload.GetWirePacket());");
-                }
+                */
+                sb.AppendLine($"         this.Owner.SendRpc(null, ms.ToArray());");
                 sb.AppendLine($"      }}");
             }
 

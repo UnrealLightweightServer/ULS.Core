@@ -54,10 +54,6 @@ namespace ULS.Core
         public WirePacket(WirePacketType packetType, byte[] payload)
         {
             PacketType = packetType;
-            if (payload == null)
-            {
-                int hehe = 42;
-            }
             RawData = new byte[payload.Length + 4];
             BinaryPrimitives.WriteInt32BigEndian(RawData.Slice(0, 4).Span, (int)packetType);
             payload.CopyTo(RawData.Slice(4));

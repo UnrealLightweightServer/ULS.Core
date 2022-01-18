@@ -35,6 +35,9 @@ public partial class ULSGenerator : ISourceGenerator
 
     internal const string Code_InvalidParam = "UR0020";
 
+    internal const string Code_RpcCallNoNetworkActor = "UR0030";
+    internal const string Code_RpcCallNotPartialType = "UR0031";
+
     internal static string logFile = "D:\\Temp\\codegen_log_2.txt";
 
     private void ClearLog()
@@ -149,6 +152,8 @@ public partial class ULSGenerator : ISourceGenerator
         #region Error cases
         public List<IFieldSymbol> ReplicationFieldsNotPrivate = new List<IFieldSymbol>();
         public List<INamedTypeSymbol> ReplicationMembersNotPartialTypes = new List<INamedTypeSymbol>();
+        public List<IMethodSymbol> RpcCallsNoNetworkActor = new List<IMethodSymbol>();
+        public List<INamedTypeSymbol> RpcCallNotPartialTypes = new List<INamedTypeSymbol>();
         #endregion
 
         public Dictionary<INamedTypeSymbol, List<IFieldSymbol>> ReplicationMembers = new Dictionary<INamedTypeSymbol, List<IFieldSymbol>>();
@@ -366,16 +371,38 @@ public partial class ULSGenerator : ISourceGenerator
         private void HandleMethod(GeneratorSyntaxContext context, MethodDeclarationSyntax mds)
         {
             var ms = context.SemanticModel.GetDeclaredSymbol(mds) as IMethodSymbol;
+            if (ms == null)
+            {
+                return;
+            }
             foreach (var attr in ms.GetAttributes())
             {
                 if (attr.AttributeClass != null &&
                     attr.AttributeClass.ToDisplayString().EndsWith("RpcCallAttribute"))
                 {
+                    var outerType = ms.ContainingType;
+                    if (IsNetworkActor(outerType) == false)
+                    {
+                        RpcCallsNoNetworkActor.Add(ms);
+                        return;
+                    }
+
+                    var typeDecl = mds.Parent as TypeDeclarationSyntax;
+                    if (typeDecl == null)
+                    {
+                        continue;
+                    }
+                    if (typeDecl.Modifiers.All(x => x.Text != "partial"))
+                    {
+                        RpcCallNotPartialTypes.Add(outerType);
+                        return;
+                    }
+
                     List<IMethodSymbol> list;
-                    if (RpcMethodsByType.TryGetValue(ms.ContainingType, out list) == false)
+                    if (RpcMethodsByType.TryGetValue(outerType, out list) == false)
                     {
                         list = new List<IMethodSymbol>();
-                        RpcMethodsByType[ms.ContainingType] = list;
+                        RpcMethodsByType[outerType] = list;
                     }
 
                     list.Add(ms);

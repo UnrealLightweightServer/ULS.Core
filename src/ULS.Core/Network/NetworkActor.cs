@@ -33,6 +33,13 @@ namespace ULS.Core
         public INetworkOwner Owner { get; private set; }
 
         /// <summary>
+        /// Whether this actor is only relevena for the specified IWirePacketSender.
+        /// Set to null to make relevant for all clients.
+        /// If set to null, this actor will be completely unknown to all other clients
+        /// </summary>
+        public IWirePacketSender? NetworkRelevantOnlyFor { get; set; } = null;
+
+        /// <summary>
         /// Do not call explicitly.
         /// Only spawn network actors through SpawnNetworkActor<> of the INetworkOwner implementation
         /// </summary>

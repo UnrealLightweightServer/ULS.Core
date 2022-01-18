@@ -10,8 +10,6 @@ namespace ULS.Core
     [AttributeUsage(AttributeTargets.Method | AttributeTargets.Event)]
     public class RpcCallAttribute : Attribute
     {
-        public bool IsBroadcast { get; set; } = true;
-
         public string[] ParameterNames { get; set; } = Array.Empty<string>();
     }
 }

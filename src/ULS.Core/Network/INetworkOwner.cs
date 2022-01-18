@@ -29,7 +29,7 @@ namespace ULS.Core
         /// this function.
         /// Leave <paramref name="overrideUniqueId"/> at -1 unless you know what you're doing.
         /// </summary>
-        T SpawnNetworkActor<T>(long overrideUniqueId = -1) where T : NetworkActor;
+        T SpawnNetworkActor<T>(IWirePacketSender? networkRelevantOnlyFor = null, long overrideUniqueId = -1) where T : NetworkActor;
 
         /// <summary>
         /// Despawns the specified network actor
@@ -37,15 +37,20 @@ namespace ULS.Core
         void DespawnNetworkActor<T>(T actor) where T : NetworkActor;
 
         /// <summary>
-        /// Directly replicate the content to the client.
+        /// Directly replicate the content to the client(s).
         /// Wrap the byte array into a replication packet.
         /// </summary>
-        void ReplicateValueDirect(byte[] replicationData);
+        void ReplicateValueDirect(NetworkActor valueOwner, byte[] replicationData);
 
         /// <summary>
         /// Used to manually invoke a member replication. Should not be called by external
         /// code unless the ReplicationStrategy is set to manual.
         /// </summary>
         void ReplicateValues();
+
+        /// <summary>
+        /// Send RPC call to the specified target or all known targets if target is null
+        /// </summary>
+        void SendRpc(IRpcTarget? target, byte[] data);
     }
 }
