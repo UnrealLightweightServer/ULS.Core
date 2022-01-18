@@ -18,9 +18,13 @@ namespace ULS.Core
         Rpc = 100,                      // Generic remote procedure call. Can be sent by both parties.
         RpcResponse = 101,              // Response for an RPC. Can be sent by both parties.
 
-        ReplicationMessage = 110,       // Replication message. Sent by the server only.
-        SpawnActorMessage = 111,        // Spawns a new network actor on the client. Sent by the server only.
-        DespawnActorMessage = 112,      // Despawns a network actor on the client. Sent by the server only.
+        Replication = 110,              // Replication message. Sent by the server only.
+        SpawnActor = 111,               // Spawns a new network actor on the client. Sent by the server only.
+        DespawnActor = 112,             // Despawns a network actor on the client. Sent by the server only.
+        NewObject = 113,                // Creates a new UObject based object on the client. Sent by the server only.
+        DestroyObject = 114,            // Destroy a UObject based object on the client. Sent by the server only.
+        RpcCall = 115,                  // Serialized RpcCall. Can be sent by both parties.
+        RpcCallResponse = 116,          // Serialized response to an RpcCall. Can be sent by both parties.
 
         Custom = 200,                   // Custom, user-specific data. Ignored in low-level operations
     }
@@ -50,6 +54,10 @@ namespace ULS.Core
         public WirePacket(WirePacketType packetType, byte[] payload)
         {
             PacketType = packetType;
+            if (payload == null)
+            {
+                int hehe = 42;
+            }
             RawData = new byte[payload.Length + 4];
             BinaryPrimitives.WriteInt32BigEndian(RawData.Slice(0, 4).Span, (int)packetType);
             payload.CopyTo(RawData.Slice(4));

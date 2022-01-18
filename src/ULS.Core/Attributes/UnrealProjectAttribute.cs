@@ -16,7 +16,7 @@ namespace ULS.Core
 
         public string ProjectFile { get; set; } = string.Empty;
 
-        public string Module { get; set; } = string.Empty;
+        public string Plugin { get; set; } = string.Empty;
 
         public bool IsCodeGenerationEnabled { get; set; } = true;
     }

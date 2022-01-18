@@ -10,7 +10,7 @@ public class UnrealProject
 
     public string ProjectFile { get; set; } = string.Empty;
 
-    public string Module { get; set; } = string.Empty;
+    public string Plugin { get; set; } = string.Empty;
 
     public bool IsCodeGenerationEnabled { get; set; } = true;
 }
@@ -23,7 +23,8 @@ public partial class ULSGenerator : ISourceGenerator
     internal const string Code_UnrealProjectAttribute = "UR0003";
     internal const string Code_UnrealCodeSkip = "UR0004";
     internal const string Code_UnrealProjectFile = "UR0005";
-    internal const string Code_UnrealModuleInvalid = "UR0006";
+    internal const string Code_UnrealPluginInvalid = "UR0006";
+    internal const string Code_UnrealMissingFile = "UR0007";
 
     internal const string Code_ClientIRpcTargetInterface = "UR0010";
 
@@ -76,13 +77,13 @@ public partial class ULSGenerator : ISourceGenerator
             }
             Log("END Execute C#");
 
-            Log("BEGIN Execute Unreal");
-            GenerateUnrealClasses(context, receiver);
-            Log("END Execute Unreal");
-
             Log("BEGIN Execute C# Client");
             GenerateCSharpClientClasses(context, receiver);
             Log("END Execute C# Client");
+
+            Log("BEGIN Execute Unreal");
+            GenerateUnrealClasses(context, receiver);
+            Log("END Execute Unreal");
         }
         catch (Exception ex)
         {
@@ -278,8 +279,8 @@ public partial class ULSGenerator : ISourceGenerator
                             case "ProjectFile":
                                 UnrealProject.ProjectFile = (string)attrData.Value.Value;
                                 break;
-                            case "Module":
-                                UnrealProject.Module = (string)attrData.Value.Value;
+                            case "Plugin":
+                                UnrealProject.Plugin = (string)attrData.Value.Value;
                                 break;
                         }
                     }
@@ -308,7 +309,8 @@ public partial class ULSGenerator : ISourceGenerator
                     list.Add(ts);
                 }
 
-                if (attr.AttributeClass.ToDisplayString().EndsWith("CSharpClientAttribute"))
+                if (attr.AttributeClass != null && 
+                    attr.AttributeClass.ToDisplayString().EndsWith("CSharpClientAttribute"))
                 {
                     CSharpClientTypes.Add(ts);
                 }

@@ -19,8 +19,17 @@ namespace ULS.CodeGen
 
             foreach (var item in receiver.UnrealClassTypeLookup)
             {
-                string srcFile = FindImplementationFileForClass(item.Key);
-                string hdrFile = FindHeaderFileForClass(item.Key);
+                string? srcFile = FindImplementationFileForClass(item.Key);
+                string? hdrFile = FindHeaderFileForClass(item.Key);
+
+                if (srcFile == null || hdrFile == null)
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                        Code_UnrealMissingFile, "", $"Could not find file for class {item.Key} with expected filename {GetBaseFilenameForClass(item.Key)}",
+                        "", DiagnosticSeverity.Error, true),
+                        null));
+                    return;
+                }
 
                 // Get Methods for this class (Server To Client)
                 List<IMethodSymbol> methods = new List<IMethodSymbol>();
@@ -251,10 +260,10 @@ namespace ULS.CodeGen
                         sb.AppendLine($"   TArray<uint8> bytes;");
                         sb.AppendLine($"   bytes.AddUninitialized(Len);");
                         sb.AppendLine($"   FMemory::Memcpy(bytes.GetData(), cnv.Get(), Len);");
-                        sb.AppendLine($"   UWirePacket* packet = NewObject<UWirePacket>();");
+                        sb.AppendLine($"   UULSWirePacket* packet = NewObject<UULSWirePacket>();");
                         sb.AppendLine($"   packet->PacketType = (int32)EWirePacketType::Rpc;");
                         sb.AppendLine($"   packet->Payload = bytes;");
-                        sb.AppendLine($"   this->SendWirePacket(packet);");
+                        sb.AppendLine($"   this->Transport->SendWirePacket(packet);");
 
                         sb.AppendLine($"}}");
                         sb.AppendLine($"");
@@ -284,7 +293,7 @@ namespace ULS.CodeGen
             File.WriteAllText(filename, contents);
         }
 
-        private string FindHeaderFileForClass(string className)
+        private string? FindHeaderFileForClass(string className)
         {
             string baseFn = GetBaseFilenameForClass(className) + ".h";
             if (File.Exists(Path.Combine(UnrealModuleBaseDir, baseFn)))
@@ -305,7 +314,7 @@ namespace ULS.CodeGen
             return null;
         }
 
-        private string FindImplementationFileForClass(string className)
+        private string? FindImplementationFileForClass(string className)
         {
             string baseFn = GetBaseFilenameForClass(className) + ".cpp";
             if (File.Exists(Path.Combine(UnrealModuleBaseDir, baseFn)))
@@ -326,9 +335,9 @@ namespace ULS.CodeGen
             return null;
         }
 
-        private string GetBaseFilenameForClass(string className)
+        private string? GetBaseFilenameForClass(string className)
         {
-            if (className == null || className.Length < 2)
+            if (className.Length < 2)
             {
                 return className;
             }
@@ -376,13 +385,15 @@ namespace ULS.CodeGen
 
             UnrealModuleBaseDir = Path.Combine(
                 Path.GetDirectoryName(receiver.UnrealProject.ProjectFile),
+                "Plugins",
+                receiver.UnrealProject.Plugin,
                 "Source",
-                receiver.UnrealProject.Module);
+                receiver.UnrealProject.Plugin);
 
             if (Directory.Exists(UnrealModuleBaseDir) == false)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                    Code_UnrealModuleInvalid, "", "Module folder at '" + UnrealModuleBaseDir +
+                    Code_UnrealPluginInvalid, "", "Module folder at '" + UnrealModuleBaseDir +
                     "' does not exist or is not readable. Skipping code generation for Unreal. Check the Module field in the UnrealProjectAttribute.",
                     "", DiagnosticSeverity.Error, true),
                     null));
