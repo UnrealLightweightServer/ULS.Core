@@ -51,6 +51,6 @@ namespace ULS.Core
         /// <summary>
         /// Send RPC call to the specified target or all known targets if target is null
         /// </summary>
-        void SendRpc(IRpcTarget? target, byte[] data);
+        void SendRpc(IWirePacketSender? target, byte[] data);
     }
 }

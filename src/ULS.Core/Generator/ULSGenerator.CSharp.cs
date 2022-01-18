@@ -13,10 +13,12 @@ namespace ULS.CodeGen
         {
             if (ValidateReplicationTypes(context, receiver) == false)
             {
+                // TODO: Add warning
                 return false;
             }
             if (ValidateRpcCallTypes(context, receiver) == false)
             {
+                // TODO: Add warning
                 return false;
             }
 
@@ -27,6 +29,7 @@ namespace ULS.CodeGen
                 string? code = GenerateSourceForReplicatedMembers(context, pair.Key, pair.Value);
                 if (code == null)
                 {
+                    // TODO: Add warning
                     continue;
                 }
                 context.AddSource(fn, code);
@@ -36,7 +39,12 @@ namespace ULS.CodeGen
             {
                 string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__methods.g.cs";
 
-                string code = GenerateSourceForMethods(context, pair.Key, pair.Value);
+                string? code = GenerateSourceForMethods(context, pair.Key, pair.Value);
+                if (code == null)
+                {
+                    // TODO: Add warning
+                    continue;
+                }
                 context.AddSource(fn, code);
             }
 
@@ -98,7 +106,7 @@ namespace ULS.CodeGen
 
             return false;
         }
-        
+
         private string? GenerateSourceForReplicatedMembers(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IFieldSymbol> members)
         {
             bool generateIfChangedCode = false;
@@ -138,19 +146,19 @@ namespace ULS.CodeGen
                     sb.AppendLine($"               writer.Write((int)0);");
                     sb.AppendLine($"               writer.Write(UniqueId);");
                     sb.AppendLine($"               writer.Write((int)1);");
-                    string ? serializeFunc = GetSerializeFunction(context, field);
+                    string? serializeFunc = GetSerializeFunction(context, field);
                     if (serializeFunc != null)
                     {
                         sb.AppendLine($"               {serializeFunc};");
-                    }                    
-                    sb.AppendLine($"               Owner.ReplicateValueDirect(this, ms.ToArray());"); 
+                    }
+                    sb.AppendLine($"               Owner.ReplicateValueDirect(this, ms.ToArray());");
                 }
                 sb.AppendLine($"            }}");
                 sb.AppendLine($"         }}");
                 sb.AppendLine($"      }}");
                 sb.AppendLine($"      public event Action? {GetReplicationFieldPublicName(field)}_OnValueChanged;");
                 sb.AppendLine($"      ");
-            }            
+            }
             sb.AppendLine($"      protected override void ReplicateValuesInternal(BinaryWriter writer, bool forced, ref int numberOfSerializedFields)");
             sb.AppendLine($"      {{");
             sb.AppendLine($"         base.ReplicateValuesInternal(writer, forced, ref numberOfSerializedFields);");
@@ -164,7 +172,7 @@ namespace ULS.CodeGen
                     sb.AppendLine($"         if (forced || {field.Name} != {field.Name}_replicationBackingField)");
                     sb.AppendLine($"         {{");
                     sb.AppendLine($"            {field.Name}_replicationBackingField = {field.Name};");
-                    
+
                 }
                 string? serializeFunc = GetSerializeFunction(context, field);
                 if (serializeFunc == null)
@@ -374,7 +382,7 @@ namespace ULS.CodeGen
                 Code_ReplicationInvalidPropertyType, "", $"Type (Class: {symbolType.ToDisplayString()}) is not supported by replication",
                 "", DiagnosticSeverity.Error, true),
                 field.Locations.Length > 0 ? field.Locations[0] : null));
-            
+
             return null;
         }
         #endregion
@@ -435,7 +443,7 @@ namespace ULS.CodeGen
                         if (ms.Parameters.Length < 1)
                         {
                             context.ReportDiagnostic(
-                                Diagnostic.Create(new DiagnosticDescriptor(Code_RpcCallAtLeastOne, "", 
+                                Diagnostic.Create(new DiagnosticDescriptor(Code_RpcCallAtLeastOne, "",
                                 "RpcCall client event must have at least one parameter.", "", DiagnosticSeverity.Error, true),
                                 item.Locations.Length > 0 ? item.Locations[0] : null));
                             return string.Empty;
@@ -446,7 +454,7 @@ namespace ULS.CodeGen
                         if (firstParamIsEqual == false)
                         {
                             context.ReportDiagnostic(
-                                Diagnostic.Create(new DiagnosticDescriptor(Code_RpcCallFirstParam, "", 
+                                Diagnostic.Create(new DiagnosticDescriptor(Code_RpcCallFirstParam, "",
                                 "The first parameter of an RpcCall client event must be of the same type as the enclosing " +
                                 "class. (" + typeSymbol.ToDisplayString() + ")", "", DiagnosticSeverity.Error, true),
                                 item.Locations.Length > 0 ? item.Locations[0] : null));
@@ -525,12 +533,12 @@ namespace ULS.CodeGen
                     Code_RpcCallNotPartialType, "", "Classes using RpcCalls must be declared as partial",
                     "", DiagnosticSeverity.Error, true),
                     item.Locations.Length > 0 ? item.Locations[0] : null));
-            }            
+            }
 
             return false;
         }
 
-        private string GenerateSourceForMethods(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> items)
+        private string? GenerateSourceForMethods(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> items)
         {
             StringBuilder sb = new StringBuilder();
             sb.AppendLine($"using System.Text;");
@@ -563,6 +571,17 @@ namespace ULS.CodeGen
                 sb.AppendLine($"         writer.Write(Encoding.ASCII.GetBytes(\"{item.Name}\"));");
                 sb.AppendLine($"         writer.Write(Encoding.ASCII.GetByteCount(\"{GetReturnType(item)}\"));");
                 sb.AppendLine($"         writer.Write(Encoding.ASCII.GetBytes(\"{GetReturnType(item)}\"));");
+                for (int i = 0; i < item.Parameters.Length; i++)
+                {
+                    var parameter = item.Parameters[i];
+
+                    string? serializeFunc = GetSerializeParameterFunction(context, parameter);
+                    if (serializeFunc == null)
+                    {
+                        return null;
+                    }
+                    sb.AppendLine($"         {serializeFunc};");
+                }
                 /*for (int i = 0; i < item.Parameters.Length; i++)
                 {
                     var parameter = item.Parameters[i];
@@ -608,13 +627,52 @@ namespace ULS.CodeGen
                     sb.AppendLine($"         }});");
                 }
                 */
-                sb.AppendLine($"         this.Owner.SendRpc(null, ms.ToArray());");
+                sb.AppendLine($"         this.Owner.SendRpc(NetworkRelevantOnlyFor, ms.ToArray());");
                 sb.AppendLine($"      }}");
             }
 
             sb.AppendLine($"   }}");
             sb.AppendLine($"}}");
             return sb.ToString();
+        }
+
+        private static string GetReplicationParameterReplicationName(IParameterSymbol param)
+        {
+            var str = param.Name;
+            return char.ToUpperInvariant(str[0]) + str.Substring(1);
+        }
+
+        private static string? GetSerializeParameterFunction(GeneratorExecutionContext context, IParameterSymbol param)
+        {
+            ITypeSymbol symbolType = param.Type;
+            string symbolName = GetReplicationParameterReplicationName(param);
+            switch (symbolType.ToString())
+            {
+                case "short":
+                case "int":
+                case "long":
+                case "float":
+                case "bool":
+                    return $"SerializeValue<{symbolType}>(writer, {param.Name}, \"{symbolName}\")";
+
+                case "string":
+                    return $"SerializeString(writer, {param.Name}, \"{symbolName}\")";
+
+                case "System.Numerics.Vector3":
+                    return $"SerializeVector3(writer, {param.Name}, \"{symbolName}\")";
+            }
+
+            if (IsSubclassOf(symbolType, "NetworkActor"))
+            {
+                return $"SerializeRef(writer, {param.Name}, \"{symbolName}\")";
+            }
+
+            context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                Code_ReplicationInvalidPropertyType, "", $"Type (Class: {symbolType.ToDisplayString()}) is not supported by replication",
+                "", DiagnosticSeverity.Error, true),
+                param.Locations.Length > 0 ? param.Locations[0] : null));
+
+            return null;
         }
 
         private string GetParameterType(IParameterSymbol ps)
