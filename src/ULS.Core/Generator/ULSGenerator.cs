@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using ULS.Core;
 
 namespace ULS.CodeGen;
 
@@ -10,7 +11,7 @@ public class UnrealProject
 
     public string ProjectFile { get; set; } = string.Empty;
 
-    public string Plugin { get; set; } = string.Empty;
+    public string Module { get; set; } = string.Empty;
 
     public bool IsCodeGenerationEnabled { get; set; } = true;
 }
@@ -151,7 +152,7 @@ public partial class ULSGenerator : ISourceGenerator
     /// </summary>
     class SyntaxReceiver : ISyntaxContextReceiver
     {
-        public UnrealProject UnrealProject { get; set; } = null;
+        public UnrealProjectAttribute? UnrealProject { get; set; } = null;
 
         #region Error cases
         public List<IFieldSymbol> ReplicationFieldsNotPrivate = new List<IFieldSymbol>();
@@ -269,7 +270,7 @@ public partial class ULSGenerator : ISourceGenerator
                 if (attr.AttributeClass != null &&
                     attr.AttributeClass.ToDisplayString().EndsWith("UnrealProjectAttribute"))
                 {
-                    UnrealProject = new UnrealProject();
+                    UnrealProject = new UnrealProjectAttribute();
 
                     foreach (var attrData in attr.ConstructorArguments)
                     {
@@ -288,8 +289,8 @@ public partial class ULSGenerator : ISourceGenerator
                             case "ProjectFile":
                                 UnrealProject.ProjectFile = (string)attrData.Value.Value;
                                 break;
-                            case "Plugin":
-                                UnrealProject.Plugin = (string)attrData.Value.Value;
+                            case "Module":
+                                UnrealProject.Module = (string)attrData.Value.Value;
                                 break;
                         }
                     }

@@ -99,15 +99,20 @@ namespace ULS.CodeGen
             foreach (var item in methods)
             {
                 sb.AppendLine($"\t// {item.Name}");
-                sb.AppendLine($"\tif (methodName == \"{item.Name}\")");
+                sb.AppendLine($"\tif (methodName == TEXT(\"{item.Name}\"))");
                 sb.AppendLine($"\t{{");
+
+                for (int i = 0; i < item.Parameters.Length; i++)
+                {
+                    sb.AppendLine($"\t\tauto param_{item.Name}_{i} = " +
+                        GetUnrealDeserializeParameterFunction(item.Parameters[i]) + "(packet, position, position);");
+                }
 
                 sb.Append($"\t\t{item.Name}(existingActor");
                 for (int i = 0; i < item.Parameters.Length; i++)
                 {
                     sb.Append(", ");
-                    string line = GetUnrealDeserializeFunction(item.Parameters[i]) + "(packet, position, position)";
-                    sb.Append(line);
+                    sb.Append($"param_{item.Name}_{i}");
                 }
                 sb.AppendLine($");");
                 sb.AppendLine($"\t}}");
@@ -224,7 +229,7 @@ namespace ULS.CodeGen
                         sb.AppendLine($"   FString methodName = TEXT(\"{item.Name}\");");
                         sb.AppendLine($"   FString returnType = TEXT(\"void\");");
                         sb.AppendLine($"   ");
-                        sb.AppendLine($"   int requiredPayloadSize = 4 + 8 + 4 + methodName.Len() + 4 + returnType.Len();");
+                        sb.AppendLine($"   int requiredPayloadSize = 4 + 8 + 4 + methodName.Len() + 4 + returnType.Len() + 4;");
                         for (int j = 1; j < ms.Parameters.Length; j++)
                         {
                             sb.AppendLine($"   FString fieldName_{GetEventParameterName(item, j, eventParameterNameLookup)} = TEXT(\"{GetEventParameterName(item, j, eventParameterNameLookup)}\");");
@@ -244,6 +249,7 @@ namespace ULS.CodeGen
                         sb.AppendLine($"   packet->PutInt64(FindUniqueId(caller), position, position);");
                         sb.AppendLine($"   packet->PutString(methodName, position, position);");
                         sb.AppendLine($"   packet->PutString(returnType, position, position);");
+                        sb.AppendLine($"   packet->PutInt32({ms.Parameters.Length - 1}, position, position); // number of parameters");
                         for (int j = 1; j < ms.Parameters.Length; j++)
                         {
                             string serializeFunc = GetUnrealSerializeParameterFunction(ms.Parameters[j]);
@@ -372,10 +378,8 @@ namespace ULS.CodeGen
 
             UnrealModuleBaseDir = Path.Combine(
                 Path.GetDirectoryName(receiver.UnrealProject.ProjectFile),
-                "Plugins",
-                receiver.UnrealProject.Plugin,
                 "Source",
-                receiver.UnrealProject.Plugin);
+                receiver.UnrealProject.Module);
 
             if (Directory.Exists(UnrealModuleBaseDir) == false)
             {
@@ -486,6 +490,40 @@ namespace ULS.CodeGen
 
                 case "System.Numerics.Vector3":
                     return "DeserializeVector";
+
+                default:
+                    // TODO: Show error (unsupported type)
+                    return string.Empty;
+            }
+        }
+
+        private static string GetUnrealDeserializeParameterFunction(IParameterSymbol paramSymbol)
+        {
+            if (IsNetworkActor(paramSymbol.Type) == true)
+            {
+                return "DeserializeRefParameter";
+            }
+
+            string csharpType = paramSymbol.Type.ToString();
+            switch (csharpType)
+            {
+                case "string":
+                    return "DeserializeStringParameter";
+
+                case "short":
+                    return "DeserializeInt16Parameter";
+
+                case "int":
+                    return "DeserializeInt32Parameter";
+
+                case "long":
+                    return "DeserializeInt64Parameter";
+
+                case "float":
+                    return "DeserializeFloat32Parameter";
+
+                case "System.Numerics.Vector3":
+                    return "DeserializeVectorParameter";
 
                 default:
                     // TODO: Show error (unsupported type)

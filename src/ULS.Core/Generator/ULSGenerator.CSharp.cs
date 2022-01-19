@@ -440,8 +440,8 @@ namespace ULS.CodeGen
 
             sb.AppendLine($"      protected override void ProcessRpcMethodInternal(BinaryReader reader)");
             sb.AppendLine($"      {{");
-            sb.AppendLine($"         string methodName = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));");
-            sb.AppendLine($"         string returnType = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));");
+            sb.AppendLine($"         string methodName = Encoding.UTF8.GetString(reader.ReadBytes(reader.ReadInt32()));");
+            sb.AppendLine($"         string returnType = Encoding.UTF8.GetString(reader.ReadBytes(reader.ReadInt32()));");
             sb.AppendLine($"         int numberOfParameters = reader.ReadInt32();");
             sb.AppendLine($"         switch (methodName)");
             sb.AppendLine($"         {{");
@@ -536,10 +536,10 @@ namespace ULS.CodeGen
                 sb.AppendLine($"         BinaryWriter writer = new BinaryWriter(ms);");
                 sb.AppendLine($"         writer.Write((int)0);              // flags");
                 sb.AppendLine($"         writer.Write(this.UniqueId);");
-                sb.AppendLine($"         writer.Write(Encoding.ASCII.GetByteCount(\"{item.Name}\"));");
-                sb.AppendLine($"         writer.Write(Encoding.ASCII.GetBytes(\"{item.Name}\"));");
-                sb.AppendLine($"         writer.Write(Encoding.ASCII.GetByteCount(\"{GetReturnType(item)}\"));");
-                sb.AppendLine($"         writer.Write(Encoding.ASCII.GetBytes(\"{GetReturnType(item)}\"));");
+                sb.AppendLine($"         writer.Write(Encoding.UTF8.GetByteCount(\"{item.Name}\"));");
+                sb.AppendLine($"         writer.Write(Encoding.UTF8.GetBytes(\"{item.Name}\"));");
+                sb.AppendLine($"         writer.Write(Encoding.UTF8.GetByteCount(\"{GetReturnType(item)}\"));");
+                sb.AppendLine($"         writer.Write(Encoding.UTF8.GetBytes(\"{GetReturnType(item)}\"));");
                 sb.AppendLine($"         writer.Write((int){item.Parameters.Length}); // Number of parameters");
                 for (int i = 0; i < item.Parameters.Length; i++)
                 {

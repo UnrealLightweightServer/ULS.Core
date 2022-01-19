@@ -40,6 +40,19 @@ namespace ULS.Core
         public IWirePacketSender? NetworkRelevantOnlyFor { get; set; } = null;
 
         /// <summary>
+        /// Update frequency of variable replication for replication fields 
+        /// set to ReplicationStrategy.Automatic.
+        /// Represented in ticks.
+        /// </summary>
+        public long NetUpdateFrequencyTicks = TimeSpan.TicksPerMillisecond * 500;
+
+        /// <summary>
+        /// Last time in ticks when replicated fields where last updated
+        /// TODO: Needs to be on a per-client basis
+        /// </summary>
+        public long LastReplicationTimeTicks = DateTimeOffset.MinValue.Ticks;
+
+        /// <summary>
         /// Do not call explicitly.
         /// Only spawn network actors through SpawnNetworkActor<> of the INetworkOwner implementation
         /// </summary>
