@@ -13,40 +13,76 @@ namespace ULS.CodeGen
             if (receiver.CSharpClientTypes.Count == 0)
             {
                 return;
-            }
-
-            var clientType = receiver.CSharpClientTypes[0];
-
-            bool intfFound = ImplementsInterface(clientType, "IRpcTarget");
-            if (intfFound == false)
-            {
-                context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                    Code_ClientIRpcTargetInterface, "", "Classes with CSharpClientAttribute must implement the IRpcTarget interface",
-                    "", DiagnosticSeverity.Error, true),
-                    clientType.Locations.Length > 0 ? clientType.Locations[0] : null));
-                return;
-            }
+            }            
 
             List<IEventSymbol> events = new List<IEventSymbol>();
             foreach (var pair in receiver.RpcEventsByType)
             {
-                events.AddRange(pair.Value);
+                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__client_methods.g.cs";
+
+                string? code = GenerateCSharpClientEvents(context, pair.Key, pair.Value, receiver.RpcEventParameterNameLookup);
+                if (code == null)
+                {
+                    // TODO: Add warning
+                    continue;
+                }
+                context.AddSource(fn, code);
             }
 
             List<IMethodSymbol> methods = new List<IMethodSymbol>();
             foreach (var pair in receiver.RpcMethodsByType)
             {
-                methods.AddRange(pair.Value);
+                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__client_events.g.cs";
+
+                string? code = GenerateCSharpClientEventHandlers(context, pair.Key, pair.Value);
+                if (code == null)
+                {
+                    // TODO: Add warning
+                    continue;
+                }
+                context.AddSource(fn, code);
             }
-
-            GenerateCSharpClientEvents(context, clientType, events);
-
-            GenerateCSharpClientEventHandlers(context, clientType, methods);
         }
 
-        private void GenerateCSharpClientEventHandlers(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> methods)
+        private string GenerateClientProcessRpc(GeneratorExecutionContext context, string methodName, IMethodSymbol item, string baseIndent = "")
         {
             StringBuilder sb = new StringBuilder();
+
+            sb.AppendLine($"{baseIndent}private void ProcessRpc{methodName}(BinaryReader reader)");
+            sb.AppendLine($"{baseIndent}{{");
+
+            string parameterList = string.Empty;
+            for (int j = 0; j < item.Parameters.Length; j++)
+            {
+                if (j > 0)
+                {
+                    parameterList += ", ";
+                }
+
+                parameterList += "param_" + item.Parameters[j].Name;
+
+                sb.AppendLine($"{baseIndent}   var param_{item.Parameters[j].Name} = " + 
+                    GetDeserializeParameterFunction(context, item.Parameters[j]) + ";");
+
+                sb.AppendLine($"");
+            }
+
+            if (parameterList.Length > 0)
+            {
+                parameterList = ", " + parameterList;
+            }
+            parameterList = $"this" + parameterList;
+
+            sb.AppendLine($"{baseIndent}   OnHandle_{methodName}?.Invoke({parameterList});");
+            sb.AppendLine($"{baseIndent}}}");
+
+            return sb.ToString();
+        }
+
+        private string? GenerateCSharpClientEventHandlers(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> methods)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine($"using System.Text;");
             sb.AppendLine($"using ULS.Core;");
             sb.AppendLine($"");
             sb.AppendLine($"namespace {typeSymbol.ContainingNamespace.ToDisplayString()}");
@@ -54,21 +90,26 @@ namespace ULS.CodeGen
             sb.AppendLine($"   partial class {typeSymbol.Name}");
             sb.AppendLine($"   {{");
 
-            sb.AppendLine($"      partial void Client_ProcessRpcMethod(RpcPayload rpc)");
+            sb.AppendLine($"      protected override void Client_ProcessRpcMethodInternal(BinaryReader reader)");
             sb.AppendLine($"      {{");
-            sb.AppendLine($"         switch (rpc.MethodName)");
+            sb.AppendLine($"         long pos = reader.BaseStream.Position;");
+            sb.AppendLine($"         string methodName = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));");
+            sb.AppendLine($"         string returnType = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));");
+            sb.AppendLine($"         int numberOfParameters = reader.ReadInt32();");
+            sb.AppendLine($"         switch (methodName)");
             sb.AppendLine($"         {{");
             foreach (var item in methods)
             {
                 sb.AppendLine($"            case \"{item.Name}\":");
-                sb.AppendLine($"               ProcessRpc{item.Name}(rpc);");
+                sb.AppendLine($"               ProcessRpc{item.Name}(reader);");
                 sb.AppendLine($"               break;");
             }
 
-            sb.AppendLine($"            default:");
+            /*,sb.AppendLine($"            default:");
             sb.AppendLine($"               // If unhandled here, let parent method try to handle the RPC call");
-            sb.AppendLine($"               HandleRpcPacket(rpc);");
-            sb.AppendLine($"               break;");
+            sb.AppendLine($"               reader.BaseStream.Seek(pos, SeekOrigin.Begin);");
+            sb.AppendLine($"               HandleRpcPacket(reader);");
+            sb.AppendLine($"               break;");*/
 
             sb.AppendLine($"         }}");
             sb.AppendLine($"      }}");
@@ -89,43 +130,15 @@ namespace ULS.CodeGen
                         delegateParameters += item.Parameters[j].Type.ToString() + " " + item.Parameters[j].Name;
                     }
                 }
+                if (delegateParameters.Length > 0)
+                {
+                    delegateParameters = ", " + delegateParameters;
+                }
+                delegateParameters = $"{typeSymbol.Name} caller" + delegateParameters;
 
                 sb.AppendLine($"      protected delegate void {item.Name}Delegate({delegateParameters});");
                 sb.AppendLine($"      protected event {item.Name}Delegate? OnHandle_{item.Name};");
-                sb.AppendLine($"      void ProcessRpc{item.Name}(RpcPayload rpc)");
-                sb.AppendLine($"      {{");
-
-                string parameterList = string.Empty;
-                for (int j = 0; j < item.Parameters.Length; j++)
-                {
-                    if (j > 0)
-                    {
-                        parameterList += ", ";
-                    }
-
-                    parameterList += "param_" + item.Parameters[j].Name;
-
-                    if (IsNetworkActor(item.Parameters[j].Type) == true)
-                    {
-                        sb.AppendLine($"         var param_{item.Parameters[j].Name}_uniqueId = " +
-                            $"rpc.GetObject(\"{item.Parameters[j].Name}\", " +
-                            $"out bool found_{item.Parameters[j].Name});");
-                        sb.AppendLine($"         var param_{item.Parameters[j].Name} = GetNetworkActor<{item.Parameters[j].Type}>(param_{item.Parameters[j].Name}_uniqueId);");
-                    }
-                    else
-                    {
-                        sb.AppendLine($"         var param_{item.Parameters[j].Name} = " +
-                            $"rpc.{GetGetter(item.Parameters[j].Type)}(\"{item.Parameters[j].Name}\", " +
-                            $"out bool found_{item.Parameters[j].Name});");
-                    }
-                    sb.AppendLine($"         if (found_{item.Parameters[j].Name} == false)");
-                    sb.AppendLine($"         {{");
-                    sb.AppendLine($"            throw new Exception(\"Required parameter '{item.Parameters[j].Name}' not found or not of required type '{item.Parameters[j].Type}'\");");
-                    sb.AppendLine($"         }}");
-                }
-
-                sb.AppendLine($"         OnHandle_{item.Name}?.Invoke({parameterList});");
-                sb.AppendLine($"      }}");
+                sb.Append(GenerateClientProcessRpc(context, item.Name, item, "      "));
 
                 sb.AppendLine($"      ");
             }
@@ -133,15 +146,14 @@ namespace ULS.CodeGen
             sb.AppendLine($"   }}");
             sb.AppendLine($"}}");
 
-            string fn = typeSymbol.ToDisplayString().Replace(".", "_") + "__client_methods.g.cs";
-
-            string code = sb.ToString();
-            context.AddSource(fn, code);
+            return sb.ToString();
         }
 
-        private void GenerateCSharpClientEvents(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> events)
+        private string? GenerateCSharpClientEvents(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> events,
+            Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             StringBuilder sb = new StringBuilder();
+            sb.AppendLine($"using System.Text;");
             sb.AppendLine($"using ULS.Core;");
             sb.AppendLine($"");
             sb.AppendLine($"namespace {typeSymbol.ContainingNamespace.ToDisplayString()}");
@@ -156,9 +168,13 @@ namespace ULS.CodeGen
                 {
                     if (members[i].Name == "Invoke")
                     {
-                        sb.Append($"      void Server_{item.Name}(");
+                        sb.Append($"      public void Server_{item.Name}(");
 
                         var ms = members[i] as IMethodSymbol;
+                        if (ms == null)
+                        {
+                            continue;
+                        }
                         // Skip first, which is the Controller itself
                         for (int j = 1; j < ms.Parameters.Length; j++)
                         {
@@ -166,63 +182,35 @@ namespace ULS.CodeGen
                             {
                                 sb.Append(", ");
                             }
-                            sb.Append(ms.Parameters[j].Type.ToDisplayString() + " " + ms.Parameters[j].Name);
+                            sb.Append(ms.Parameters[j].Type.ToDisplayString() + " " + GetEventParameterName(item, j, eventParameterNameLookup));
                         }
 
                         sb.AppendLine($")");
                         sb.AppendLine($"      {{");
 
-                        sb.AppendLine($"         RpcPayload payload = new RpcPayload();");
-                        sb.AppendLine($"         payload.MethodName = \"{item.Name}\";");
-                        sb.AppendLine($"         payload.ReturnType = \"{GetReturnType(ms)}\";");
-                        sb.AppendLine($"         payload.ReturnValue = string.Empty;");
+                        sb.AppendLine($"         MemoryStream ms = new MemoryStream();");
+                        sb.AppendLine($"         BinaryWriter writer = new BinaryWriter(ms);");
+                        sb.AppendLine($"         writer.Write((int)0);              // flags");
+                        sb.AppendLine($"         writer.Write(this.UniqueId);");
+                        sb.AppendLine($"         writer.Write(Encoding.ASCII.GetByteCount(\"{item.Name}\"));");
+                        sb.AppendLine($"         writer.Write(Encoding.ASCII.GetBytes(\"{item.Name}\"));");
+                        sb.AppendLine($"         writer.Write(Encoding.ASCII.GetByteCount(\"{GetReturnType(ms)}\"));");
+                        sb.AppendLine($"         writer.Write(Encoding.ASCII.GetBytes(\"{GetReturnType(ms)}\"));");
+                        sb.AppendLine($"         writer.Write((int){ms.Parameters.Length - 1}); // Number of parameters");
+                        // Skip first, which is the Controller itself
                         for (int j = 1; j < ms.Parameters.Length; j++)
                         {
                             var parameter = ms.Parameters[j];
 
-                            sb.AppendLine($"         payload.Parameters.Add(new RpcPayload.RpcParameter()");
-                            sb.AppendLine($"         {{");
-                            sb.AppendLine($"            Name = \"{parameter.Name}\",");
-                            var paramType = GetParameterType(parameter);
-                            switch (paramType)
+                            string? serializeFunc = GetSerializeParameterFunction(context, 
+                                GetEventParameterName(item, j, eventParameterNameLookup), parameter);
+                            if (serializeFunc == null)
                             {
-                                case "String":
-                                    sb.AppendLine($"            Type = RpcParameterType.String,");
-                                    sb.AppendLine($"            Value = {parameter.Name},");
-                                    break;
-
-                                case "Int32":
-                                    sb.AppendLine($"            Type = RpcParameterType.Int,");
-                                    sb.AppendLine($"            Value = {parameter.Name},");
-                                    break;
-
-                                case "Int64":
-                                    sb.AppendLine($"            Type = RpcParameterType.Long,");
-                                    sb.AppendLine($"            Value = {parameter.Name},");
-                                    break;
-
-                                case "Float":
-                                    sb.AppendLine($"            Type = RpcParameterType.Float,");
-                                    sb.AppendLine($"            Value = {parameter.Name},");
-                                    break;
-
-                                case "NetworkActor":
-                                    sb.AppendLine($"            Type = RpcParameterType.Object,");
-                                    sb.AppendLine($"            Value = {parameter.Name}.UniqueId,");
-                                    break;
-
-                                default:
-                                    context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                                        Code_InvalidParam, "", "Invalid parameter type: " + paramType,
-                                        "", DiagnosticSeverity.Error, true),
-                                        parameter.Locations.Length > 0 ? parameter.Locations[0] : null));
-                                    break;
+                                return null;
                             }
-                            sb.AppendLine($"         }});");
+                            sb.AppendLine($"         {serializeFunc};");
                         }
-
-                        sb.AppendLine($"         WirePacket packet = payload.GetWirePacket();");
-                        sb.AppendLine($"         this.SendRpc(packet);");
+                        sb.AppendLine($"         this.Owner.SendRpc(null, ms.ToArray());");
 
                         sb.AppendLine($"      }}");
                         sb.AppendLine($"");
@@ -233,10 +221,7 @@ namespace ULS.CodeGen
             sb.AppendLine($"   }}");
             sb.AppendLine($"}}");
 
-            string fn = typeSymbol.ToDisplayString().Replace(".", "_") + "__client_events.g.cs";
-
-            string code = sb.ToString();
-            context.AddSource(fn, code);
+            return sb.ToString();
         }
     }
 }

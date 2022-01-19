@@ -80,9 +80,13 @@ public partial class ULSGenerator : ISourceGenerator
             }
             Log("END Execute C#");
 
-            Log("BEGIN Execute C# Client");
-            GenerateCSharpClientClasses(context, receiver);
-            Log("END Execute C# Client");
+            bool generateClientCode = true;
+            if (generateClientCode)
+            {
+                Log("BEGIN Execute C# Client");
+                GenerateCSharpClientClasses(context, receiver);
+                Log("END Execute C# Client");
+            }
 
             Log("BEGIN Execute Unreal");
             GenerateUnrealClasses(context, receiver);

@@ -24,7 +24,7 @@ namespace ULS.CodeGen
 
             foreach (var pair in receiver.ReplicationMembers)
             {
-                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__properties.g.cs";
+                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__server_properties.g.cs";
 
                 string? code = GenerateSourceForReplicatedMembers(context, pair.Key, pair.Value);
                 if (code == null)
@@ -37,7 +37,7 @@ namespace ULS.CodeGen
 
             foreach (var pair in receiver.RpcMethodsByType)
             {
-                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__methods.g.cs";
+                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__server_methods.g.cs";
 
                 string? code = GenerateSourceForMethods(context, pair.Key, pair.Value);
                 if (code == null)
@@ -48,18 +48,18 @@ namespace ULS.CodeGen
                 context.AddSource(fn, code);
             }
 
-            foreach (var pair in receiver.RpcEventsByType)
+            /*foreach (var pair in receiver.RpcEventsByType)
             {
                 string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__events_wrapperfunction.g.cs";
                 string code = GenerateRpcEventWrapperFunction(pair.Key, pair.Value);
                 context.AddSource(fn, code);
-            }
+            }*/
 
             foreach (var pair in receiver.RpcEventsByType)
             {
-                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__events.g.cs";
+                string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__server_events.g.cs";
 
-                string code = GenerateSourceForEvents(context, pair.Key, pair.Value);
+                string code = GenerateSourceForEvents(context, pair.Key, pair.Value, receiver.RpcEventParameterNameLookup);
                 context.AddSource(fn, code);
             }
 
@@ -388,125 +388,94 @@ namespace ULS.CodeGen
         #endregion
 
         #region Events
-        private string GenerateRpcEventWrapperFunction(INamedTypeSymbol typeSymbol, List<IEventSymbol> rpcEvents)
+        private string GenerateProcessRpc(GeneratorExecutionContext context,  string methodName, IMethodSymbol item, IEventSymbol eItem,
+            Dictionary<IEventSymbol, string[]> eventParameterNameLookup, string baseIndent = "")
         {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine($"using ULS.Core;");
-            sb.AppendLine($"");
-            sb.AppendLine($"namespace {typeSymbol.ContainingNamespace.ToDisplayString()}");
-            sb.AppendLine($"{{");
-            sb.AppendLine($"   partial class {typeSymbol.Name}");
-            sb.AppendLine($"   {{");
-            sb.AppendLine($"      partial void ProcessRpcMethod(RpcPayload rpc)");
-            sb.AppendLine($"      {{");
 
-            sb.AppendLine($"         switch (rpc.MethodName)");
-            sb.AppendLine($"         {{");
-            foreach (var item in rpcEvents)
+            sb.AppendLine($"{baseIndent}private void ProcessRpc{methodName}(BinaryReader reader)");
+            sb.AppendLine($"{baseIndent}{{");
+
+            string parameterList = string.Empty;
+            for (int j = 1; j < item.Parameters.Length; j++)
             {
-                sb.AppendLine($"            case \"{item.Name}\":");
-                sb.AppendLine($"               ProcessRpc{item.Name}(rpc);");
-                sb.AppendLine($"               break;");
-            }
-            sb.AppendLine($"         }}");
+                if (j > 1)
+                {
+                    parameterList += ", ";
+                }
 
-            sb.AppendLine($"      }}");
-            sb.AppendLine($"   }}");
-            sb.AppendLine($"}}");
+                parameterList += "param_" + GetEventParameterName(eItem, j, eventParameterNameLookup);
+
+                sb.AppendLine($"{baseIndent}   var param_{GetEventParameterName(eItem, j, eventParameterNameLookup)} = " +
+                    GetDeserializeParameterFunction(context, item.Parameters[j]) + ";");
+            }
+
+            if (parameterList.Length > 0)
+            {
+                parameterList = ", " + parameterList;
+            }
+            parameterList = $"this" + parameterList;
+
+            if (item.Parameters.Length > 1)
+            {
+                sb.AppendLine($"");
+            }
+            sb.AppendLine($"{baseIndent}   {methodName}?.Invoke({parameterList});");
+            sb.AppendLine($"{baseIndent}}}");
+
             return sb.ToString();
         }
 
-        private string GenerateSourceForEvents(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> items)
+        private string GenerateSourceForEvents(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> items,
+            Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             StringBuilder sb = new StringBuilder();
-
+            sb.AppendLine($"using System.Text;");
             sb.AppendLine($"using ULS.Core;");
             sb.AppendLine($"");
             sb.AppendLine($"namespace {typeSymbol.ContainingNamespace.ToDisplayString()}");
             sb.AppendLine($"{{");
             sb.AppendLine($"   partial class {typeSymbol.Name}");
             sb.AppendLine($"   {{");
+
+            sb.AppendLine($"      protected override void ProcessRpcMethodInternal(BinaryReader reader)");
+            sb.AppendLine($"      {{");
+            sb.AppendLine($"         string methodName = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));");
+            sb.AppendLine($"         string returnType = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));");
+            sb.AppendLine($"         int numberOfParameters = reader.ReadInt32();");
+            sb.AppendLine($"         switch (methodName)");
+            sb.AppendLine($"         {{");
             foreach (var item in items)
             {
-                //sb.AppendLine($"// item.Locations.Length > 0 ? item.Locations[0] : null => {(item.Locations.Length > 0 ? item.Locations[0] : null)}");
+                sb.AppendLine($"            case \"{item.Name}\":");
+                sb.AppendLine($"               ProcessRpc{item.Name}(reader);");
+                sb.AppendLine($"               break;");
+            }
+            sb.AppendLine($"         }}");
+            sb.AppendLine($"      }}");
+            sb.AppendLine("");
 
+            foreach (var item in items)
+            {
                 var members = item.Type.GetMembers();
-                sb.AppendLine($"      private void ProcessRpc{item.Name}(RpcPayload rpc)");
-                sb.AppendLine($"      {{");
-                string parameterList = string.Empty;
+
                 for (int i = 0; i < members.Length; i++)
                 {
                     if (members[i].Name == "Invoke")
                     {
                         var ms = members[i] as IMethodSymbol;
-
-                        if (ms.Parameters.Length < 1)
+                        if (ms != null)
                         {
-                            context.ReportDiagnostic(
-                                Diagnostic.Create(new DiagnosticDescriptor(Code_RpcCallAtLeastOne, "",
-                                "RpcCall client event must have at least one parameter.", "", DiagnosticSeverity.Error, true),
-                                item.Locations.Length > 0 ? item.Locations[0] : null));
-                            return string.Empty;
-                        }
-
-                        var sec = SymbolEqualityComparer.Default;
-                        bool firstParamIsEqual = sec.Equals(ms.Parameters[0].Type, typeSymbol);
-                        if (firstParamIsEqual == false)
-                        {
-                            context.ReportDiagnostic(
-                                Diagnostic.Create(new DiagnosticDescriptor(Code_RpcCallFirstParam, "",
-                                "The first parameter of an RpcCall client event must be of the same type as the enclosing " +
-                                "class. (" + typeSymbol.ToDisplayString() + ")", "", DiagnosticSeverity.Error, true),
-                                item.Locations.Length > 0 ? item.Locations[0] : null));
-                            return String.Empty;
-                        }
-
-                        // Skip first, which is the Controller itself
-                        for (int j = 1; j < ms.Parameters.Length; j++)
-                        {
-                            parameterList += ", param_" + ms.Parameters[j].Name;
-
-                            if (IsNetworkActor(ms.Parameters[j].Type) == true)
-                            {
-                                sb.AppendLine($"         var param_{ms.Parameters[j].Name}_uniqueId = " +
-                                    $"rpc.GetObject(\"{ms.Parameters[j].Name}\", " +
-                                    $"out bool found_{ms.Parameters[j].Name});");
-                                sb.AppendLine($"         var param_{ms.Parameters[j].Name} = GetNetworkActor<{ms.Parameters[j].Type}>(param_{ms.Parameters[j].Name}_uniqueId);");
-                            }
-                            else
-                            {
-                                sb.AppendLine($"         var param_{ms.Parameters[j].Name} = " +
-                                    $"rpc.{GetGetter(ms.Parameters[j].Type)}(\"{ms.Parameters[j].Name}\", " +
-                                    $"out bool found_{ms.Parameters[j].Name});");
-                            }
-                            sb.AppendLine($"         if (found_{ms.Parameters[j].Name} == false)");
-                            sb.AppendLine($"         {{");
-                            sb.AppendLine($"            throw new Exception(\"Required parameter '{ms.Parameters[j].Name}' not found or not of required type '{ms.Parameters[j].Type}'\");");
-                            sb.AppendLine($"         }}");
+                            sb.Append(GenerateProcessRpc(context, item.Name, ms, item, eventParameterNameLookup, "      "));
+                            sb.AppendLine($"      ");
                         }
                     }
                 }
-                sb.AppendLine($"         {item.Name}?.Invoke(this{parameterList});");
-                sb.AppendLine($"      }}");
-                sb.AppendLine($"      ");
             }
             sb.AppendLine($"   }}");
             sb.AppendLine($"}}");
 
             return sb.ToString();
-        }
-
-        private string GetGetter(ITypeSymbol type)
-        {
-            string typeString = type.ToString();
-            switch (typeString)
-            {
-                case "int": return "GetInt32";
-                case "long": return "GetInt64";
-                case "float": return "GetFloat";
-                case "bool": return "GetBool";
-                default: return "GetString";
-            }
         }
         #endregion
 
@@ -571,64 +540,21 @@ namespace ULS.CodeGen
                 sb.AppendLine($"         writer.Write(Encoding.ASCII.GetBytes(\"{item.Name}\"));");
                 sb.AppendLine($"         writer.Write(Encoding.ASCII.GetByteCount(\"{GetReturnType(item)}\"));");
                 sb.AppendLine($"         writer.Write(Encoding.ASCII.GetBytes(\"{GetReturnType(item)}\"));");
+                sb.AppendLine($"         writer.Write((int){item.Parameters.Length}); // Number of parameters");
                 for (int i = 0; i < item.Parameters.Length; i++)
                 {
                     var parameter = item.Parameters[i];
 
-                    string? serializeFunc = GetSerializeParameterFunction(context, parameter);
+                    string? serializeFunc = GetSerializeParameterFunction(context, parameter.Name, parameter);
                     if (serializeFunc == null)
                     {
                         return null;
                     }
                     sb.AppendLine($"         {serializeFunc};");
                 }
-                /*for (int i = 0; i < item.Parameters.Length; i++)
-                {
-                    var parameter = item.Parameters[i];
-
-                    sb.AppendLine($"         payload.Parameters.Add(new RpcPayload.RpcParameter()");
-                    sb.AppendLine($"         {{");
-                    sb.AppendLine($"            Name = \"{parameter.Name}\",");
-                    var paramType = GetParameterType(parameter);
-                    switch (paramType)
-                    {
-                        case "String":
-                            sb.AppendLine($"            Type = RpcParameterType.String,");
-                            sb.AppendLine($"            Value = {parameter.Name},");
-                            break;
-
-                        case "Int32":
-                            sb.AppendLine($"            Type = RpcParameterType.Int,");
-                            sb.AppendLine($"            Value = {parameter.Name},");
-                            break;
-
-                        case "Int64":
-                            sb.AppendLine($"            Type = RpcParameterType.Long,");
-                            sb.AppendLine($"            Value = {parameter.Name},");
-                            break;
-
-                        case "Float":
-                            sb.AppendLine($"            Type = RpcParameterType.Float,");
-                            sb.AppendLine($"            Value = {parameter.Name},");
-                            break;
-
-                        case "NetworkActor":
-                            sb.AppendLine($"            Type = RpcParameterType.Object,");
-                            sb.AppendLine($"            Value = {parameter.Name}.UniqueId,");
-                            break;
-
-                        default:
-                            context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                                Code_InvalidParam, "", "Invalid parameter type: " + paramType,
-                                "", DiagnosticSeverity.Error, true),
-                                parameter.Locations.Length > 0 ? parameter.Locations[0] : null));
-                            break;
-                    }
-                    sb.AppendLine($"         }});");
-                }
-                */
                 sb.AppendLine($"         this.Owner.SendRpc(NetworkRelevantOnlyFor, ms.ToArray());");
                 sb.AppendLine($"      }}");
+                sb.AppendLine($"      ");
             }
 
             sb.AppendLine($"   }}");
@@ -636,16 +562,10 @@ namespace ULS.CodeGen
             return sb.ToString();
         }
 
-        private static string GetReplicationParameterReplicationName(IParameterSymbol param)
-        {
-            var str = param.Name;
-            return char.ToUpperInvariant(str[0]) + str.Substring(1);
-        }
-
-        private static string? GetSerializeParameterFunction(GeneratorExecutionContext context, IParameterSymbol param)
+        private static string? GetSerializeParameterFunction(GeneratorExecutionContext context, string serializedParamName, IParameterSymbol param)
         {
             ITypeSymbol symbolType = param.Type;
-            string symbolName = GetReplicationParameterReplicationName(param);
+            string symbolName = serializedParamName;
             switch (symbolType.ToString())
             {
                 case "short":
@@ -653,18 +573,18 @@ namespace ULS.CodeGen
                 case "long":
                 case "float":
                 case "bool":
-                    return $"SerializeValue<{symbolType}>(writer, {param.Name}, \"{symbolName}\")";
+                    return $"SerializeValue<{symbolType}>(writer, {symbolName}, \"{symbolName}\")";
 
                 case "string":
-                    return $"SerializeString(writer, {param.Name}, \"{symbolName}\")";
+                    return $"SerializeString(writer, {symbolName}, \"{symbolName}\")";
 
                 case "System.Numerics.Vector3":
-                    return $"SerializeVector3(writer, {param.Name}, \"{symbolName}\")";
+                    return $"SerializeVector3(writer, {symbolName}, \"{symbolName}\")";
             }
 
             if (IsSubclassOf(symbolType, "NetworkActor"))
             {
-                return $"SerializeRef(writer, {param.Name}, \"{symbolName}\")";
+                return $"SerializeRef(writer, {symbolName}, \"{symbolName}\")";
             }
 
             context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
@@ -675,14 +595,42 @@ namespace ULS.CodeGen
             return null;
         }
 
-        private string GetParameterType(IParameterSymbol ps)
+        private static string? GetDeserializeParameterFunction(GeneratorExecutionContext context, IParameterSymbol param)
         {
-            if (IsSubclassOf(ps.Type, "NetworkActor") == true)
+            ITypeSymbol symbolType = param.Type;
+            string symbolName = param.Name;
+            switch (symbolType.ToString())
             {
-                return "NetworkActor";
+                case "short":
+                case "int":
+                case "long":
+                case "float":
+                case "bool":
+                    return $"DeserializeValueWithMetadata<{symbolType}>(reader)";
+
+                case "string":
+                    return $"DeserializeStringWithMetadata(reader)";
+
+                case "System.Numerics.Vector3":
+                    return $"DeserializeVector3WithMetadata(reader)";
             }
 
-            return ps.Type.Name;
+            if (IsNetworkActor(symbolType))
+            {
+                var symbolTypeString = symbolType.ToString();
+                if (symbolTypeString.EndsWith("?"))
+                {
+                    symbolTypeString = symbolTypeString.Substring(0, symbolTypeString.Length - 1);
+                }
+                return $"DeserializeRefWithMetadata<{symbolTypeString}>(reader, Owner)";
+            }
+
+            context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                Code_ReplicationInvalidPropertyType, "", $"Type (Class: {symbolType.ToDisplayString()}) is not supported by replication",
+                "", DiagnosticSeverity.Error, true),
+                param.Locations.Length > 0 ? param.Locations[0] : null));
+
+            return null;
         }
 
         private string GetReturnType(IMethodSymbol ms)

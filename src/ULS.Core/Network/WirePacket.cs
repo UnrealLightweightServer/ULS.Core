@@ -15,9 +15,6 @@ namespace ULS.Core
         WorldBegin = 13,                // Sent by server. World enters running state
         WorldEnd = 14,                  // Sent by server. World has shut down
 
-        Rpc = 100,                      // Generic remote procedure call. Can be sent by both parties.
-        RpcResponse = 101,              // Response for an RPC. Can be sent by both parties.
-
         Replication = 110,              // Replication message. Sent by the server only.
         SpawnActor = 111,               // Spawns a new network actor on the client. Sent by the server only.
         DespawnActor = 112,             // Despawns a network actor on the client. Sent by the server only.

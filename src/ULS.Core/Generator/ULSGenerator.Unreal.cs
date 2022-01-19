@@ -33,11 +33,11 @@ namespace ULS.CodeGen
 
                 // Get Methods for this class (Server To Client)
                 List<IMethodSymbol> methods = new List<IMethodSymbol>();
-                foreach (var pair in item.Value)
+                foreach (var pair in receiver.RpcMethodsByType)
                 {
-                    if (receiver.RpcMethodsByType.TryGetValue(pair, out var typeMethods))
+                    //if (receiver.RpcMethodsByType.TryGetValue(pair, out var typeMethods))
                     {
-                        methods.AddRange(typeMethods);
+                        methods.AddRange(pair.Value);
                     }
                 }
                 GenerateHeaderDataForMethods(context, methods, hdrFile);
@@ -45,11 +45,11 @@ namespace ULS.CodeGen
 
                 // Get Events for this class (Client To Server)
                 List<IEventSymbol> events = new List<IEventSymbol>();
-                foreach (var pair in item.Value)
+                foreach (var pair in receiver.RpcEventsByType)
                 {
-                    if (receiver.RpcEventsByType.TryGetValue(pair, out var typeEvents))
+                    //if (receiver.RpcEventsByType.TryGetValue(pair, out var typeEvents))
                     {
-                        events.AddRange(typeEvents);
+                        events.AddRange(pair.Value);
                     }
                 }
                 GenerateHeaderDataForEvents(context, events, hdrFile, receiver.RpcEventParameterNameLookup);
@@ -66,17 +66,15 @@ namespace ULS.CodeGen
             StringBuilder sb = new StringBuilder();
             sb.AppendLine(start);
 
+            Log("GenerateHeaderDataForMethods: " + methods.Count());
+
             foreach (var item in methods)
             {
                 sb.AppendLine("\tUFUNCTION(BlueprintImplementableEvent, Category = Rpc)");
-                sb.Append($"\t\t{GetUnrealReturnType(item.ReturnType)} {item.Name}(");
+                sb.Append($"\t\t{GetUnrealReturnType(item.ReturnType)} {item.Name}(const AActor* callee");
                 for (int i = 0; i < item.Parameters.Length; i++)
                 {
-                    if (i > 0)
-                    {
-                        sb.Append(", ");
-                    }
-
+                    sb.Append(", ");
                     sb.Append(GetUnrealParameterType(item.Parameters[i].Type) + " " + item.Parameters[i].Name);
                 }
                 sb.AppendLine(");");
@@ -96,34 +94,22 @@ namespace ULS.CodeGen
             StringBuilder sb = new StringBuilder();
             sb.AppendLine(start);
 
+            Log("GenerateImplementationDataForMethods: " + methods.Count());
+
             foreach (var item in methods)
             {
                 sb.AppendLine($"\t// {item.Name}");
                 sb.AppendLine($"\tif (methodName == \"{item.Name}\")");
                 sb.AppendLine($"\t{{");
 
-                sb.AppendLine($"\t\t{item.Name}(");
+                sb.Append($"\t\t{item.Name}(existingActor");
                 for (int i = 0; i < item.Parameters.Length; i++)
                 {
-                    string line = string.Empty;
-                    if (IsNetworkActor(item.Parameters[i].Type) == true)
-                    {
-                        line = $"FindActor(paramField[{i}]->{GetJsonFieldGetter(item.Parameters[i])}(\"value\"))";
-                    }
-                    else
-                    { 
-                        line = $"paramField[{i}]->{GetJsonFieldGetter(item.Parameters[i])}(\"value\")";
-                    }
-                    if (i < item.Parameters.Length - 1)
-                    {
-                        sb.AppendLine($"\t\t\t\t{line},");
-                    }
-                    else
-                    {
-                        sb.AppendLine($"\t\t\t\t{line}");
-                    }
+                    sb.Append(", ");
+                    string line = GetUnrealDeserializeFunction(item.Parameters[i]) + "(packet, position, position)";
+                    sb.Append(line);
                 }
-                sb.AppendLine($"\t\t\t);");
+                sb.AppendLine($");");
                 sb.AppendLine($"\t}}");
                 sb.AppendLine($"\t");
             }
@@ -169,7 +155,7 @@ namespace ULS.CodeGen
             foreach (var item in events)
             {
                 sb.AppendLine("\tUFUNCTION(BlueprintCallable, Category = Rpc)");
-                sb.Append($"\t\tvoid Server_{GetEventName(item)}(");
+                sb.Append($"\t\tvoid Server_{GetEventName(item)}(AActor* caller");
 
                 var members = item.Type.GetMembers();
                 for (int i = 0; i < members.Length; i++)
@@ -177,13 +163,14 @@ namespace ULS.CodeGen
                     if (members[i].Name == "Invoke")
                     {
                         var ms = members[i] as IMethodSymbol;
+                        if (ms == null)
+                        {
+                            continue;
+                        }
                         // Skip first, which is the Controller itself
                         for (int j = 1; j < ms.Parameters.Length; j++)
                         {
-                            if (j > 1)
-                            {
-                                sb.Append(", ");
-                            }
+                            sb.Append(", ");
                             sb.Append(GetUnrealParameterType(ms.Parameters[j].Type) + " " + GetEventParameterName(item, j, eventParameterNameLookup));
                         }
                     }
@@ -214,57 +201,57 @@ namespace ULS.CodeGen
                     if (members[i].Name == "Invoke")
                     {
                         sb.AppendLine($"// {item.Name}");
-                        sb.Append($"void {unrealClassName}::Server_{GetEventName(item)}(");
+                        sb.Append($"void {unrealClassName}::Server_{GetEventName(item)}(AActor* caller");
 
                         var ms = members[i] as IMethodSymbol;
+                        if (ms == null)
+                        {
+                            continue;
+                        }
                         // Skip first, which is the Controller itself
                         for (int j = 1; j < ms.Parameters.Length; j++)
                         {
-                            if (j > 1)
-                            {
-                                sb.Append(", ");
-                            }
+                            sb.Append(", ");
                             sb.Append(GetUnrealParameterType(ms.Parameters[j].Type) + " " + GetEventParameterName(item, j, eventParameterNameLookup));
                         }
 
                         sb.AppendLine($")");
                         sb.AppendLine($"{{");
 
-                        sb.AppendLine($"   UVaRestJsonObject* jsonObj = NewObject<UVaRestJsonObject>();");
-                        sb.AppendLine($"   jsonObj->SetStringField(\"methodName\", TEXT(\"{item.Name}\"));");
-                        sb.AppendLine($"   jsonObj->SetInt64Field(\"uniqueMsgId\", -1);");
-                        sb.AppendLine($"   TArray<UVaRestJsonObject*> paramField;");
-
+                        sb.AppendLine($"   UULSWirePacket* packet = NewObject<UULSWirePacket>();");
+                        sb.AppendLine($"   packet->PacketType = (int32)EWirePacketType::RpcCall;");
+                        sb.AppendLine($"   ");
+                        sb.AppendLine($"   FString methodName = TEXT(\"{item.Name}\");");
+                        sb.AppendLine($"   FString returnType = TEXT(\"void\");");
+                        sb.AppendLine($"   ");
+                        sb.AppendLine($"   int requiredPayloadSize = 4 + 8 + 4 + methodName.Len() + 4 + returnType.Len();");
                         for (int j = 1; j < ms.Parameters.Length; j++)
                         {
-                            var setter = GetJsonFieldSetter(ms.Parameters[j]);
-                            sb.AppendLine($"   UVaRestJsonObject* fieldObj_{ms.Parameters[j].Name} = NewObject<UVaRestJsonObject>();");
-                            sb.AppendLine($"   fieldObj_{ms.Parameters[j].Name}->SetStringField(\"name\", TEXT(\"{ms.Parameters[j].Name}\"));");
-                            sb.AppendLine($"   fieldObj_{ms.Parameters[j].Name}->SetIntegerField(\"type\", {GetParameterType(ms.Parameters[j].Type)});");
-                            if (IsNetworkActor(ms.Parameters[j].Type) == true)
+                            sb.AppendLine($"   FString fieldName_{GetEventParameterName(item, j, eventParameterNameLookup)} = TEXT(\"{GetEventParameterName(item, j, eventParameterNameLookup)}\");");
+                            sb.Append($"   requiredPayloadSize += {GetUnrealSerializeSizeFunction(ms.Parameters[j])}(fieldName_{GetEventParameterName(item, j, eventParameterNameLookup)}");
+                            if (ms.Parameters[j].Type.ToString() == "string")
                             {
-                                //sb.AppendLine($"   fieldObj_{ms.Parameters[j].Name}->{setter}(\"value\", FindActor({GetEventParameterName(item, j, eventParameterNameLookup)}->UniqueId));");
-                                sb.AppendLine($"   fieldObj_{ms.Parameters[j].Name}->{setter}(\"value\", FindUniqueId({GetEventParameterName(item, j, eventParameterNameLookup)}));");
+                                sb.Append(", " + GetEventParameterName(item, j, eventParameterNameLookup) + ".Len()");
                             }
-                            else
-                            {
-                                sb.AppendLine($"   fieldObj_{ms.Parameters[j].Name}->{setter}(\"value\", {GetEventParameterName(item, j, eventParameterNameLookup)});");
-                            }
-                            sb.AppendLine($"   paramField.Add(fieldObj_{ms.Parameters[j].Name});");
+                            sb.AppendLine(");");
+                        }
+                        sb.AppendLine($"   TArray<uint8> bytes;");
+                        sb.AppendLine($"   bytes.AddUninitialized(requiredPayloadSize);");
+                        sb.AppendLine($"   packet->Payload = bytes;");
+
+                        sb.AppendLine($"   int position = 0;");
+                        sb.AppendLine($"   packet->PutInt32(0, position, position); // flags");
+                        sb.AppendLine($"   packet->PutInt64(FindUniqueId(caller), position, position);");
+                        sb.AppendLine($"   packet->PutString(methodName, position, position);");
+                        sb.AppendLine($"   packet->PutString(returnType, position, position);");
+                        for (int j = 1; j < ms.Parameters.Length; j++)
+                        {
+                            string serializeFunc = GetUnrealSerializeParameterFunction(ms.Parameters[j]);
+                            sb.AppendLine($"   {serializeFunc}(packet, fieldName_{GetEventParameterName(item, j, eventParameterNameLookup)}, {GetEventParameterName(item, j, eventParameterNameLookup)}, position, position);");
                         }
 
-                        sb.AppendLine($"   jsonObj->SetObjectArrayField(\"Parameters\", paramField);");
-                        sb.AppendLine($"   auto str = jsonObj->EncodeJsonToSingleString();");
-                        sb.AppendLine($"   FTCHARToUTF8 cnv(*str);");
-                        sb.AppendLine($"   int32 Len = cnv.Length();");
-                        sb.AppendLine($"   TArray<uint8> bytes;");
-                        sb.AppendLine($"   bytes.AddUninitialized(Len);");
-                        sb.AppendLine($"   FMemory::Memcpy(bytes.GetData(), cnv.Get(), Len);");
-                        sb.AppendLine($"   UULSWirePacket* packet = NewObject<UULSWirePacket>();");
-                        sb.AppendLine($"   packet->PacketType = (int32)EWirePacketType::Rpc;");
-                        sb.AppendLine($"   packet->Payload = bytes;");
                         sb.AppendLine($"   this->Transport->SendWirePacket(packet);");
-
+                        
                         sb.AppendLine($"}}");
                         sb.AppendLine($"");
                     }
@@ -275,7 +262,7 @@ namespace ULS.CodeGen
             sb.Append("\t" + end);
 
             string code = sb.ToString();
-            ReplaceInFile(filename, code, start, end);            
+            ReplaceInFile(filename, code, start, end);
         }
 
         #region File Utils
@@ -376,7 +363,7 @@ namespace ULS.CodeGen
             if (File.Exists(receiver.UnrealProject.ProjectFile) == false)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                    Code_UnrealProjectFile, "", "Unreal project file at '" + receiver.UnrealProject.ProjectFile + 
+                    Code_UnrealProjectFile, "", "Unreal project file at '" + receiver.UnrealProject.ProjectFile +
                     "' does not exist or is not readable. Skipping code generation for Unreal.",
                     "", DiagnosticSeverity.Error, true),
                     null));
@@ -403,6 +390,108 @@ namespace ULS.CodeGen
             return true;
         }
         #endregion
+
+        private static string GetUnrealSerializeSizeFunction(IParameterSymbol paramSymbol)
+        {
+            if (IsNetworkActor(paramSymbol.Type) == true)
+            {
+                return "GetSerializeRefParameterSize";
+            }
+
+            string csharpType = paramSymbol.Type.ToString();
+            switch (csharpType)
+            {
+                case "string":
+                    return "GetSerializeStringParameterSize";
+
+                case "short":
+                    return "GetSerializeInt16ParameterSize";
+
+                case "int":
+                    return "GetSerializeInt32ParameterSize";
+
+                case "long":
+                    return "GetSerializeInt64ParameterSize";
+
+                case "float":
+                    return "GetSerializeFloat32ParameterSize";
+
+                case "System.Numerics.Vector3":
+                    return "GetSerializeVectorParameterSize";
+
+                default:
+                    // TODO: Show error (unsupported type)
+                    return string.Empty;
+            }
+        }
+
+        private static string GetUnrealSerializeParameterFunction(IParameterSymbol paramSymbol)
+        {
+            if (IsNetworkActor(paramSymbol.Type) == true)
+            {
+                return "SerializeRefParameter";
+            }
+
+            string csharpType = paramSymbol.Type.ToString();
+            switch (csharpType)
+            {
+                case "string":
+                    return "SerializeStringParameter";
+
+                case "short":
+                    return "SerializeInt16Parameter";
+
+                case "int":
+                    return "SerializeInt32Parameter";
+
+                case "long":
+                    return "SerializeInt64Parameter";
+
+                case "float":
+                    return "SerializeFloat32Parameter";
+
+                case "System.Numerics.Vector3":
+                    return "SerializeVectorParameter";
+
+                default:
+                    // TODO: Show error (unsupported type)
+                    return string.Empty;
+            }
+        }
+
+        private static string GetUnrealDeserializeFunction(IParameterSymbol paramSymbol)
+        {
+            if (IsNetworkActor(paramSymbol.Type) == true)
+            {
+                return "DeserializeRef";
+            }
+
+            string csharpType = paramSymbol.Type.ToString();
+            switch (csharpType)
+            {
+                case "string":
+                    return "DeserializeString";
+
+                case "short":
+                    return "DeserializeInt16";
+
+                case "int":
+                    return "DeserializeInt32";
+
+                case "long":
+                    return "DeserializeInt64";
+
+                case "float":
+                    return "DeserializeFloat32";
+
+                case "System.Numerics.Vector3":
+                    return "DeserializeVector";
+
+                default:
+                    // TODO: Show error (unsupported type)
+                    return string.Empty;
+            }
+        }
 
         private object GetJsonFieldGetter(IParameterSymbol paramSymbol)
         {

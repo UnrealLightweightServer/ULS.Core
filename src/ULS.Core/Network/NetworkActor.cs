@@ -134,6 +134,13 @@ namespace ULS.Core
             return networkOwner.GetNetworkActor<T>(refUniqueId);
         }
 
+        public T? DeserializeRefWithMetadata<T>(BinaryReader reader, INetworkOwner networkOwner) where T : NetworkActor
+        {
+            byte type = reader.ReadByte();
+            string fieldName = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));
+            return DeserializeRef<T>(reader, networkOwner);
+        }
+
         protected void SerializeValue<T>(BinaryWriter writer, T value, string fieldName) where T : struct
         {
             writer.Write((byte)ReplicatedFieldType.Primitive);      // Value
@@ -168,6 +175,13 @@ namespace ULS.Core
             return result;
         }
 
+        protected T DeserializeValueWithMetadata<T>(BinaryReader reader) where T : struct
+        {
+            byte type = reader.ReadByte();
+            string fieldName = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));
+            return DeserializeValue<T>(reader);
+        }
+
         protected void SerializeString(BinaryWriter writer, string value, string fieldName)
         {
             writer.Write((byte)ReplicatedFieldType.String);      // String
@@ -180,6 +194,13 @@ namespace ULS.Core
         protected string DeserializeString(BinaryReader reader)
         {
             return Encoding.UTF8.GetString(reader.ReadBytes(reader.ReadInt32()));
+        }
+
+        protected string DeserializeStringWithMetadata(BinaryReader reader)
+        {
+            byte type = reader.ReadByte();
+            string fieldName = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));
+            return DeserializeString(reader);
         }
 
         protected void SerializeVector3(BinaryWriter writer, System.Numerics.Vector3 value, string fieldName)
@@ -198,6 +219,33 @@ namespace ULS.Core
                 reader.ReadSingle(),
                 reader.ReadSingle(),
                 reader.ReadSingle());
+        }
+
+        protected System.Numerics.Vector3 DeserializeVector3WithMetadata(BinaryReader reader)
+        {
+            byte type = reader.ReadByte();
+            string fieldName = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));
+            return DeserializeVector3(reader);
+        }
+
+        public void ProcessRpcMethod(BinaryReader reader)
+        {
+            ProcessRpcMethodInternal(reader);
+        }
+
+        protected virtual void ProcessRpcMethodInternal(BinaryReader reader)
+        {
+            // 
+        }
+
+        public void Client_ProcessRpcMethod(BinaryReader reader)
+        {
+            Client_ProcessRpcMethodInternal(reader);
+        }
+
+        protected virtual void Client_ProcessRpcMethodInternal(BinaryReader reader)
+        {
+            // 
         }
     }
 }
