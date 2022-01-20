@@ -159,11 +159,14 @@ public partial class ULSGenerator : ISourceGenerator
         public List<INamedTypeSymbol> ReplicationMembersNotPartialTypes = new List<INamedTypeSymbol>();
         public List<IMethodSymbol> RpcCallsNoNetworkActor = new List<IMethodSymbol>();
         public List<INamedTypeSymbol> RpcCallNotPartialTypes = new List<INamedTypeSymbol>();
+        public List<IEventSymbol> RpcEventsUsingCallStrategy = new List<IEventSymbol>();
         #endregion
 
         public Dictionary<INamedTypeSymbol, List<IFieldSymbol>> ReplicationMembers = new Dictionary<INamedTypeSymbol, List<IFieldSymbol>>();
 
         public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> RpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
+        public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> UnrealGeneratedRpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
+        public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> UnrealReflectedRpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
         public Dictionary<INamedTypeSymbol, List<IEventSymbol>> RpcEventsByType { get; } = new Dictionary<INamedTypeSymbol, List<IEventSymbol>>();
         public Dictionary<IEventSymbol, string[]> RpcEventParameterNameLookup { get; } = new Dictionary<IEventSymbol, string[]>();
 
@@ -354,6 +357,12 @@ public partial class ULSGenerator : ISourceGenerator
                                             RpcEventParameterNameLookup[es] = values;
                                         }                                            
                                         break;
+
+                                    case "CallStrategy":
+                                        {
+                                            RpcEventsUsingCallStrategy.Add(es);
+                                            return;
+                                        }
                                 }
                             }
 
@@ -403,17 +412,56 @@ public partial class ULSGenerator : ISourceGenerator
                         return;
                     }
 
+                    RpcCallAttribute defaultAttrib = new RpcCallAttribute();
+                    CallStrategy callStrategyToUse = defaultAttrib.CallStrategy;
+                    foreach (var attrData in attr.NamedArguments)
+                    {
+                        switch (attrData.Key)
+                        {
+                            case "CallStrategy":
+                                {
+                                    callStrategyToUse = (CallStrategy)attrData.Value.Value;
+                                }
+                                break;
+                        }
+                    }
+
+                    switch (callStrategyToUse)
+                    {
+                        case CallStrategy.GenerateInWrapperClass:
+                            {
+                                List<IMethodSymbol> theList;
+                                if (UnrealGeneratedRpcMethodsByType.TryGetValue(outerType, out theList) == false)
+                                {
+                                    theList = new List<IMethodSymbol>();
+                                    UnrealGeneratedRpcMethodsByType[outerType] = theList;
+                                }
+                                theList.Add(ms);
+                            }
+                            break;
+                        case CallStrategy.Reflection:
+                            {
+                                List<IMethodSymbol> theList;
+                                if (UnrealReflectedRpcMethodsByType.TryGetValue(outerType, out theList) == false)
+                                {
+                                    theList = new List<IMethodSymbol>();
+                                    UnrealReflectedRpcMethodsByType[outerType] = theList;
+                                }
+                                theList.Add(ms);
+                            }
+                            break;
+                    }
+
                     List<IMethodSymbol> list;
                     if (RpcMethodsByType.TryGetValue(outerType, out list) == false)
                     {
                         list = new List<IMethodSymbol>();
                         RpcMethodsByType[outerType] = list;
                     }
-
                     list.Add(ms);
                 }
             }
-        }            
+        }
 
         private void Log(string text)
         {

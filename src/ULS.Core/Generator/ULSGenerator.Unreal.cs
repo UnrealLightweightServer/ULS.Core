@@ -31,26 +31,26 @@ namespace ULS.CodeGen
                     return;
                 }
 
-                // Get Methods for this class (Server To Client)
+                // Get Methods for this class (Server To Client, Generated code)
                 List<IMethodSymbol> methods = new List<IMethodSymbol>();
-                foreach (var pair in receiver.RpcMethodsByType)
+                foreach (var pair in receiver.UnrealGeneratedRpcMethodsByType)
                 {
-                    //if (receiver.RpcMethodsByType.TryGetValue(pair, out var typeMethods))
-                    {
-                        methods.AddRange(pair.Value);
-                    }
+                    methods.AddRange(pair.Value);
+                }
+                // Get Methods for this class (Server To Client, Reflected code)
+                List<IMethodSymbol> refl_methods = new List<IMethodSymbol>();
+                foreach (var pair in receiver.UnrealReflectedRpcMethodsByType)
+                {
+                    refl_methods.AddRange(pair.Value);
                 }
                 GenerateHeaderDataForMethods(context, methods, hdrFile);
-                GenerateImplementationDataForMethods(context, methods, srcFile);
+                GenerateImplementationDataForMethods(context, methods, refl_methods, srcFile);
 
                 // Get Events for this class (Client To Server)
                 List<IEventSymbol> events = new List<IEventSymbol>();
                 foreach (var pair in receiver.RpcEventsByType)
                 {
-                    //if (receiver.RpcEventsByType.TryGetValue(pair, out var typeEvents))
-                    {
-                        events.AddRange(pair.Value);
-                    }
+                    events.AddRange(pair.Value);
                 }
                 GenerateHeaderDataForEvents(context, events, hdrFile, receiver.RpcEventParameterNameLookup);
                 GenerateImplementationDataForEvents(context, events, srcFile, item.Key, receiver.RpcEventParameterNameLookup);
@@ -86,7 +86,8 @@ namespace ULS.CodeGen
             ReplaceInFile(filename, code, start, end);
         }
 
-        private void GenerateImplementationDataForMethods(GeneratorExecutionContext context, List<IMethodSymbol> methods, string filename)
+        private void GenerateImplementationDataForMethods(GeneratorExecutionContext context, List<IMethodSymbol> generated_methods, 
+            List<IMethodSymbol> reflection_methods, string filename)
         {
             string start = "BEGIN_RPC_BP_EVENTS_FROM_SERVER_CALL";
             string end = "END_RPC_BP_EVENTS_FROM_SERVER_CALL";
@@ -94,9 +95,41 @@ namespace ULS.CodeGen
             StringBuilder sb = new StringBuilder();
             sb.AppendLine(start);
 
-            Log("GenerateImplementationDataForMethods: " + methods.Count());
+            Log("GenerateImplementationDataForMethods: " + generated_methods.Count());
+            Log("GenerateImplementationDataForMethods: " + reflection_methods.Count());
 
-            foreach (var item in methods)
+            foreach (var item in reflection_methods)
+            {
+                sb.AppendLine($"\t// {item.Name}");
+                sb.AppendLine($"\tif (methodName == TEXT(\"{item.Name}\"))");
+                sb.AppendLine($"\t{{");
+                sb.AppendLine($"\t\tauto cls = existingActor->GetClass();");
+                sb.AppendLine($"\t\tUFunction* function = cls->FindFunctionByName(FName(TEXT(\"{item.Name}\")));");
+                sb.AppendLine($"\t\tif (IsValid(function) == false)");
+                sb.AppendLine($"\t\t{{");
+                sb.AppendLine($"\t\t\t// TODO: Log properly");
+                sb.AppendLine($"\t\t\tUE_LOG(LogTemp, Error, TEXT(\"Failed to call function {item.Name} on actor of type %s with uniqueId: %ld\"), *cls->GetName(), FindUniqueId(existingActor));");
+                sb.AppendLine($"\t\t\treturn;");
+                sb.AppendLine($"\t\t}}");
+                sb.AppendLine($"\t\tstruct");
+                sb.AppendLine($"\t\t{{");
+                for (int i = 0; i < item.Parameters.Length; i++)
+                {
+                    sb.AppendLine($"\t\t\t{GetUnrealParameterType(item.Parameters[i].Type)} param_{item.Name}_{i} = {GetUnrealParameterDefaultValueType(item.Parameters[i].Type)};");
+                }
+                sb.AppendLine($"\t\t}} FuncParams;");
+                for (int i = 0; i < item.Parameters.Length; i++)
+                {
+                    sb.AppendLine($"\t\tFuncParams.param_{item.Name}_{i} = " +
+                        GetUnrealDeserializeParameterFunction(item.Parameters[i]) + "(packet, position, position);");
+                }
+                sb.AppendLine($"\t\texistingActor->ProcessEvent(function, &FuncParams);");
+                sb.AppendLine($"\t\treturn;");
+                sb.AppendLine($"\t}}");
+                sb.AppendLine($"\t");
+            }
+
+            foreach (var item in generated_methods)
             {
                 sb.AppendLine($"\t// {item.Name}");
                 sb.AppendLine($"\tif (methodName == TEXT(\"{item.Name}\"))");
@@ -115,6 +148,7 @@ namespace ULS.CodeGen
                     sb.Append($"param_{item.Name}_{i}");
                 }
                 sb.AppendLine($");");
+                sb.AppendLine($"\t\treturn;");
                 sb.AppendLine($"\t}}");
                 sb.AppendLine($"\t");
             }
@@ -652,6 +686,12 @@ namespace ULS.CodeGen
                 case "string":
                     return "const FString&";
 
+                case "bool":
+                    return "bool";
+
+                case "short":
+                    return "int16";
+
                 case "int":
                     return "int32";
 
@@ -661,7 +701,48 @@ namespace ULS.CodeGen
                 case "float":
                     return "float";
 
+                case "System.Numerics.Vector3":
+                    return "FVector";
+
                 default:
+                    // TODO: Error
+                    return "void";
+            }
+        }
+
+        private string GetUnrealParameterDefaultValueType(ITypeSymbol type)
+        {
+            if (IsNetworkActor(type) == true)
+            {
+                return "nullptr";
+            }
+
+            string csharpType = type.ToString();
+            switch (csharpType)
+            {
+                case "string":
+                    return "FString::Empty()";
+
+                case "bool":
+                    return "false";
+
+                case "short":
+                    return "0";
+
+                case "int":
+                    return "0";
+
+                case "long":
+                    return "0";
+
+                case "float":
+                    return "0";
+
+                case "System.Numerics.Vector3":
+                    return "FVector()";
+
+                default:
+                    // TODO: Error
                     return "void";
             }
         }
