@@ -170,6 +170,18 @@ namespace ULS.CodeGen
             return name;
         }
 
+        private bool HasEventParameterName(IEventSymbol symbol, int index, Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
+        {
+            if (eventParameterNameLookup.TryGetValue(symbol, out var names))
+            {
+                if (index >= 0 && index < names.Length)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private string GetEventParameterName(IEventSymbol symbol, int index, Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             if (eventParameterNameLookup.TryGetValue(symbol, out var names))
@@ -193,9 +205,6 @@ namespace ULS.CodeGen
 
             foreach (var item in events)
             {
-                sb.AppendLine("\tUFUNCTION(BlueprintCallable, Category = Rpc)");
-                sb.Append($"\t\tvoid Server_{GetEventName(item)}(AActor* caller");
-
                 var members = item.Type.GetMembers();
                 for (int i = 0; i < members.Length; i++)
                 {
@@ -206,15 +215,25 @@ namespace ULS.CodeGen
                         {
                             continue;
                         }
+
+                        sb.AppendLine("\tUFUNCTION(BlueprintCallable, Category = Rpc)");
+                        string callerName = "caller";
+                        if (HasEventParameterName(item, 0, eventParameterNameLookup) == true)
+                        {
+                            callerName = GetEventParameterName(item, 0, eventParameterNameLookup);
+                        }
+                        sb.Append($"\t\tvoid Server_{GetEventName(item)}(AActor* " + callerName);
+
                         // Skip first, which is the Controller itself
                         for (int j = 1; j < ms.Parameters.Length; j++)
                         {
                             sb.Append(", ");
                             sb.Append(GetUnrealParameterType(ms.Parameters[j].Type) + " " + GetEventParameterName(item, j, eventParameterNameLookup));
                         }
+
+                        sb.AppendLine(");");
                     }
                 }
-                sb.AppendLine(");");
             }
 
             sb.Append("\t" + end);
@@ -240,7 +259,12 @@ namespace ULS.CodeGen
                     if (members[i].Name == "Invoke")
                     {
                         sb.AppendLine($"// {item.Name}");
-                        sb.Append($"void {unrealClassName}::Server_{GetEventName(item)}(AActor* caller");
+                        string callerName = "caller";
+                        if (HasEventParameterName(item, 0, eventParameterNameLookup) == true)
+                        {
+                            callerName = GetEventParameterName(item, 0, eventParameterNameLookup);
+                        }
+                        sb.Append($"void {unrealClassName}::Server_{GetEventName(item)}(AActor* " + callerName);
 
                         var ms = members[i] as IMethodSymbol;
                         if (ms == null)
@@ -280,7 +304,7 @@ namespace ULS.CodeGen
 
                         sb.AppendLine($"   int position = 0;");
                         sb.AppendLine($"   packet->PutInt32(0, position, position); // flags");
-                        sb.AppendLine($"   packet->PutInt64(FindUniqueId(caller), position, position);");
+                        sb.AppendLine($"   packet->PutInt64(FindUniqueId({callerName}), position, position);");
                         sb.AppendLine($"   packet->PutString(methodName, position, position);");
                         sb.AppendLine($"   packet->PutString(returnType, position, position);");
                         sb.AppendLine($"   packet->PutInt32({ms.Parameters.Length - 1}, position, position); // number of parameters");
@@ -403,7 +427,7 @@ namespace ULS.CodeGen
             if (File.Exists(receiver.UnrealProject.ProjectFile) == false)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                    Code_UnrealProjectFile, "", "Unreal project file at '" + receiver.UnrealProject.ProjectFile +
+                    Code_UnrealProjectFile, "", "Unreal project file at '" + receiver.UnrealProject.ProjectFile + 
                     "' does not exist or is not readable. Skipping code generation for Unreal.",
                     "", DiagnosticSeverity.Error, true),
                     null));
@@ -454,6 +478,9 @@ namespace ULS.CodeGen
                 case "float":
                     return "GetSerializeFloat32ParameterSize";
 
+                case "bool":
+                    return "GetSerializeBoolParameterSize";
+
                 case "System.Numerics.Vector3":
                     return "GetSerializeVectorParameterSize";
 
@@ -487,6 +514,9 @@ namespace ULS.CodeGen
 
                 case "float":
                     return "SerializeFloat32Parameter";
+
+                case "bool":
+                    return "SerializeBoolParameter";
 
                 case "System.Numerics.Vector3":
                     return "SerializeVectorParameter";
@@ -522,6 +552,9 @@ namespace ULS.CodeGen
                 case "float":
                     return "DeserializeFloat32";
 
+                case "bool":
+                    return "DeserializeBool";
+
                 case "System.Numerics.Vector3":
                     return "DeserializeVector";
 
@@ -556,93 +589,15 @@ namespace ULS.CodeGen
                 case "float":
                     return "DeserializeFloat32Parameter";
 
+                case "bool":
+                    return "DeserializeBoolParameter";
+
                 case "System.Numerics.Vector3":
                     return "DeserializeVectorParameter";
 
                 default:
                     // TODO: Show error (unsupported type)
                     return string.Empty;
-            }
-        }
-
-        private object GetJsonFieldGetter(IParameterSymbol paramSymbol)
-        {
-            if (IsNetworkActor(paramSymbol.Type) == true)
-            {
-                return "GetInt64Field";
-            }
-
-            string csharpType = paramSymbol.Type.ToString();
-            switch (csharpType)
-            {
-                case "string":
-                    return "GetStringField";
-
-                case "int":
-                    return "GetIntegerField";
-
-                case "long":
-                    return "GetInt64Field";
-
-                case "float":
-                    return "GetFloatField";
-
-                default:
-                    return "GetStringField";
-            }
-        }
-
-        private object GetJsonFieldSetter(IParameterSymbol paramSymbol)
-        {
-            if (IsNetworkActor(paramSymbol.Type) == true)
-            {
-                return "SetInt64Field";
-            }
-
-            string csharpType = paramSymbol.Type.ToString();
-            switch (csharpType)
-            {
-                case "string":
-                    return "SetStringField";
-
-                case "int":
-                    return "SetIntegerField";
-
-                case "long":
-                    return "SetInt64Field";
-
-                case "float":
-                    return "SetFloatField";
-
-                default:
-                    return "SetStringField";
-            }
-        }
-
-        private string GetParameterType(ITypeSymbol type)
-        {
-            if (IsNetworkActor(type) == true)
-            {
-                return "4";
-            }
-
-            string csharpType = type.ToString();
-            switch (csharpType)
-            {
-                case "string":
-                    return "0";
-
-                case "int":
-                    return "1";
-
-                case "long":
-                    return "2";
-
-                case "float":
-                    return "3";
-
-                default:
-                    return "4";
             }
         }
 
