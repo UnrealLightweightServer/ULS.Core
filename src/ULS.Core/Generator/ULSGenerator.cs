@@ -39,6 +39,8 @@ public partial class ULSGenerator : ISourceGenerator
     internal const string Code_RpcCallNoNetworkActor = "UR0030";
     internal const string Code_RpcCallNotPartialType = "UR0031";
 
+    internal const string Code_GeneratorFailure = "UR0900";
+
 #if SIMPLE_LOGGING
     internal static string logFile = "D:\\Temp\\codegen_log_2.txt";
 
@@ -83,13 +85,19 @@ public partial class ULSGenerator : ISourceGenerator
             // retrieve the populated receiver 
             if (!(context.SyntaxContextReceiver is SyntaxReceiver receiver))
             {
+                context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                    Code_GeneratorFailure, "", "Internal error in source generator (invalid SyntaxContextReceiver)",
+                    "", DiagnosticSeverity.Error, true), null));
                 return;
             }
 
             Log("BEGIN Execute C#");
             if (GenerateCSharpClasses(context, receiver) == false)
             {
-                return;
+                context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                    Code_GeneratorFailure, "", "Failed to generate C# server code (see previous errors)",
+                    "", DiagnosticSeverity.Warning, true), null));
+                Log("Failed to generate C# code");
             }
             Log("END Execute C#");
 
@@ -107,6 +115,9 @@ public partial class ULSGenerator : ISourceGenerator
         }
         catch (Exception ex)
         {
+            context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                Code_GeneratorFailure, "", "Failed to execute code generator: " + ex,
+                "", DiagnosticSeverity.Error, true), null));
             Log("ERROR Execute: " + ex);
         }
     }

@@ -13,12 +13,16 @@ namespace ULS.CodeGen
         {
             if (ValidateReplicationTypes(context, receiver) == false)
             {
-                // TODO: Add warning
+                context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                    Code_GeneratorFailure, "", "Failed to validate replication types during C# code generation (see previous errors)",
+                    "", DiagnosticSeverity.Warning, true), null));
                 return false;
             }
             if (ValidateRpcCallTypes(context, receiver) == false)
             {
-                // TODO: Add warning
+                context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                    Code_GeneratorFailure, "", "Failed to validate rpc call types during C# code generation (see previous errors)",
+                    "", DiagnosticSeverity.Warning, true), null));
                 return false;
             }
 
@@ -488,7 +492,7 @@ namespace ULS.CodeGen
                 return true;
             }
 
-            foreach (var item in receiver.ReplicationFieldsNotPrivate)
+            foreach (var item in receiver.RpcCallsNoNetworkActor)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
                     Code_RpcCallNoNetworkActor, "", "RpcCalls can only be used in classes derived from NetworkActor",
