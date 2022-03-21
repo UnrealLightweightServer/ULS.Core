@@ -4,7 +4,22 @@ namespace ULS.Core
 {
     public enum CallStrategy
     {
+        /// <summary>
+        /// Generates a BlueprintImplementableEvent in the header file of the 
+        /// class defined in the <see cref="UnrealClassAttribute"/>.
+        /// Generates calling code in the implementation file of the 
+        /// class defined in the <see cref="UnrealClassAttribute"/>.
+        /// Does not use any reflection beyond what Unreal does itself
+        /// to invoke BP events.
+        /// </summary>
         GenerateInWrapperClass,
+
+        /// <summary>
+        /// Generates code in the implementation file of the class defined 
+        /// in the <see cref="UnrealClassAttribute"/>.
+        /// Uses reflection to lookup the function name and header of the Unreal 
+        /// function and then generates code to properly invoke it.
+        /// </summary>
         Reflection
     }
 
