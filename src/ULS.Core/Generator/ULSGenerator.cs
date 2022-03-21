@@ -462,7 +462,7 @@ public partial class ULSGenerator : ISourceGenerator
                                 theList.Add(ms);
                             }
                             break;
-                        case CallStrategy.Reflection:
+                        case CallStrategy.PartialReflection:
                             {
                                 List<IMethodSymbol> theList;
                                 if (UnrealReflectedRpcMethodsByType.TryGetValue(outerType, out theList) == false)
