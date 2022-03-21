@@ -39,6 +39,7 @@ public partial class ULSGenerator : ISourceGenerator
     internal const string Code_RpcCallNoNetworkActor = "UR0030";
     internal const string Code_RpcCallNotPartialType = "UR0031";
 
+#if SIMPLE_LOGGING
     internal static string logFile = "D:\\Temp\\codegen_log_2.txt";
 
     private void ClearLog()
@@ -50,6 +51,17 @@ public partial class ULSGenerator : ISourceGenerator
     {
         File.AppendAllText(logFile, text + Environment.NewLine);
     }
+#else
+    private void ClearLog()
+    {
+        //
+    }
+
+    private void Log(string text)
+    {
+        //
+    }
+#endif
 
     private bool ImplementsInterface(ITypeSymbol typeSymbol, string name)
     {
@@ -154,13 +166,13 @@ public partial class ULSGenerator : ISourceGenerator
     {
         public UnrealProjectAttribute? UnrealProject { get; set; } = null;
 
-        #region Error cases
+#region Error cases
         public List<IFieldSymbol> ReplicationFieldsNotPrivate = new List<IFieldSymbol>();
         public List<INamedTypeSymbol> ReplicationMembersNotPartialTypes = new List<INamedTypeSymbol>();
         public List<IMethodSymbol> RpcCallsNoNetworkActor = new List<IMethodSymbol>();
         public List<INamedTypeSymbol> RpcCallNotPartialTypes = new List<INamedTypeSymbol>();
         public List<IEventSymbol> RpcEventsUsingCallStrategy = new List<IEventSymbol>();
-        #endregion
+#endregion
 
         public Dictionary<INamedTypeSymbol, List<IFieldSymbol>> ReplicationMembers = new Dictionary<INamedTypeSymbol, List<IFieldSymbol>>();
 
@@ -463,9 +475,15 @@ public partial class ULSGenerator : ISourceGenerator
             }
         }
 
+#if SIMPLE_LOGGING
         private void Log(string text)
         {
             File.AppendAllText(logFile, text + Environment.NewLine);
         }
+#else
+        private void Log(string text)
+        {
+        }
+#endif
     }
 }

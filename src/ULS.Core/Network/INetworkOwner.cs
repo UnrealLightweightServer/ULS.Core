@@ -43,8 +43,8 @@ namespace ULS.Core
         void ReplicateValueDirect(NetworkActor valueOwner, byte[] replicationData);
 
         /// <summary>
-        /// Used to manually invoke a member replication. Should not be called by external
-        /// code unless the ReplicationStrategy is set to manual.
+        /// Used to manually invoke a member replication. Should only be called by external
+        /// code if the ReplicationStrategy is set to manual or automatic.
         /// </summary>
         void ReplicateValues();
 
