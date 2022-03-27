@@ -10,9 +10,10 @@ namespace ULS.Core
     public enum ReplicatedFieldType : byte
     {
         Reference = 0,
-        Primitive = 1,
+        PrimitiveInt = 1,
         String = 2,
-        Vector3 = 3
+        Vector3 = 3,
+        PrimitiveFloat = 4
     }
 
     /// <summary>
@@ -154,9 +155,10 @@ namespace ULS.Core
             return DeserializeRef<T>(reader, networkOwner);
         }
 
-        protected void SerializeValue<T>(BinaryWriter writer, T value, string fieldName) where T : struct
+        #region PrimitiveInt
+        protected void SerializePrimitiveInt<T>(BinaryWriter writer, T value, string fieldName) where T : struct
         {
-            writer.Write((byte)ReplicatedFieldType.Primitive);      // Value
+            writer.Write((byte)ReplicatedFieldType.PrimitiveInt);      // Value
             writer.Write(Encoding.ASCII.GetByteCount(fieldName));
             writer.Write(Encoding.ASCII.GetBytes(fieldName));            
             int size = Marshal.SizeOf(value);
@@ -169,7 +171,7 @@ namespace ULS.Core
             writer.Write(arr);
         }
 
-        protected T DeserializeValue<T>(BinaryReader reader) where T : struct
+        protected T DeserializePrimitiveInt<T>(BinaryReader reader) where T : struct
         {
             T result = default(T);
             int size = Marshal.SizeOf(result);
@@ -188,13 +190,58 @@ namespace ULS.Core
             return result;
         }
 
-        protected T DeserializeValueWithMetadata<T>(BinaryReader reader) where T : struct
+        protected T DeserializePrimitiveIntWithMetadata<T>(BinaryReader reader) where T : struct
         {
             byte type = reader.ReadByte();
             string fieldName = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));
-            return DeserializeValue<T>(reader);
+            return DeserializePrimitiveInt<T>(reader);
+        }
+        #endregion
+
+        #region PrimitiveFloat
+        protected void SerializePrimitiveFloat<T>(BinaryWriter writer, T value, string fieldName) where T : struct
+        {
+            writer.Write((byte)ReplicatedFieldType.PrimitiveFloat);      // Value
+            writer.Write(Encoding.ASCII.GetByteCount(fieldName));
+            writer.Write(Encoding.ASCII.GetBytes(fieldName));
+            int size = Marshal.SizeOf(value);
+            byte[] arr = new byte[size];
+            IntPtr ptr = Marshal.AllocHGlobal(size);
+            Marshal.StructureToPtr(value, ptr, true);
+            Marshal.Copy(ptr, arr, 0, size);
+            Marshal.FreeHGlobal(ptr);
+            writer.Write(size);
+            writer.Write(arr);
         }
 
+        protected T DeserializePrimitiveFloat<T>(BinaryReader reader) where T : struct
+        {
+            T result = default(T);
+            int size = Marshal.SizeOf(result);
+            byte[] arr = reader.ReadBytes(reader.ReadInt32());
+
+            IntPtr ptr = Marshal.AllocHGlobal(size);
+            Marshal.Copy(arr, 0, ptr, size);
+
+            var obj = Marshal.PtrToStructure(ptr, typeof(T));
+            if (obj != null)
+            {
+                result = (T)obj;
+            }
+
+            Marshal.FreeHGlobal(ptr);
+            return result;
+        }
+
+        protected T DeserializePrimitiveFloatWithMetadata<T>(BinaryReader reader) where T : struct
+        {
+            byte type = reader.ReadByte();
+            string fieldName = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));
+            return DeserializePrimitiveFloat<T>(reader);
+        }
+        #endregion
+
+        #region String
         protected void SerializeString(BinaryWriter writer, string value, string fieldName)
         {
             writer.Write((byte)ReplicatedFieldType.String);      // String
@@ -215,6 +262,7 @@ namespace ULS.Core
             string fieldName = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));
             return DeserializeString(reader);
         }
+        #endregion
 
         protected void SerializeVector3(BinaryWriter writer, System.Numerics.Vector3 value, string fieldName)
         {

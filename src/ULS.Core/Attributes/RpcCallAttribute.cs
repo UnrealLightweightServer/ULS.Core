@@ -20,7 +20,12 @@ namespace ULS.Core
         /// Uses reflection to lookup the function name and header of the Unreal 
         /// function and then generates code to properly invoke it.
         /// </summary>
-        PartialReflection
+        PartialReflection,
+
+        /// <summary>
+        /// Uses reflection-only code to invoke RPC.
+        /// </summary>
+        FullReflection
     }
 
     /// <summary>
