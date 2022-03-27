@@ -189,7 +189,7 @@ public partial class ULSGenerator : ISourceGenerator
 
         public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> RpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
         public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> UnrealGeneratedRpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
-        public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> UnrealReflectedRpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
+        public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> UnrealPartialReflRpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
         public Dictionary<INamedTypeSymbol, List<IEventSymbol>> RpcEventsByType { get; } = new Dictionary<INamedTypeSymbol, List<IEventSymbol>>();
         public Dictionary<IEventSymbol, string[]> RpcEventParameterNameLookup { get; } = new Dictionary<IEventSymbol, string[]>();
 
@@ -465,13 +465,17 @@ public partial class ULSGenerator : ISourceGenerator
                         case CallStrategy.PartialReflection:
                             {
                                 List<IMethodSymbol> theList;
-                                if (UnrealReflectedRpcMethodsByType.TryGetValue(outerType, out theList) == false)
+                                if (UnrealPartialReflRpcMethodsByType.TryGetValue(outerType, out theList) == false)
                                 {
                                     theList = new List<IMethodSymbol>();
-                                    UnrealReflectedRpcMethodsByType[outerType] = theList;
+                                    UnrealPartialReflRpcMethodsByType[outerType] = theList;
                                 }
                                 theList.Add(ms);
                             }
+                            break;
+                        case CallStrategy.FullReflection:
+                            // Nothing to do here, this will only be checked by the server generated code
+                            // and that will look directly into RpcMethodsByType
                             break;
                     }
 
