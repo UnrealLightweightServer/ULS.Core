@@ -264,6 +264,7 @@ namespace ULS.Core
         }
         #endregion
 
+        #region Vector3
         protected void SerializeVector3(BinaryWriter writer, System.Numerics.Vector3 value, string fieldName)
         {
             writer.Write((byte)ReplicatedFieldType.Vector3);
@@ -287,6 +288,17 @@ namespace ULS.Core
             byte type = reader.ReadByte();
             string fieldName = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));
             return DeserializeVector3(reader);
+        }
+        #endregion
+
+        public bool ShouldSendTo(IWirePacketSender? relevantTarget)
+        {
+            if (NetworkRelevantOnlyFor == null)
+            {
+                return true;
+            }
+
+            return NetworkRelevantOnlyFor == relevantTarget;
         }
 
         public void ProcessRpcMethod(BinaryReader reader)

@@ -210,7 +210,7 @@ namespace ULS.CodeGen
                             }
                             sb.AppendLine($"         {serializeFunc};");
                         }
-                        sb.AppendLine($"         this.Owner.SendRpc(null, ms.ToArray());");
+                        sb.AppendLine($"         this.Owner.SendRpc(NetworkRelevantOnlyFor, ms.ToArray());");
 
                         sb.AppendLine($"      }}");
                         sb.AppendLine($"");
