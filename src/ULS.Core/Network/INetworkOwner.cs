@@ -20,21 +20,33 @@ namespace ULS.Core
         long GetNextUniqueId();
 
         /// <summary>
-        /// Returns the network actor identified through the uniqueId
+        /// Returns the network object identified through the uniqueId
         /// </summary>
         T? GetNetworkObject<T>(long uniqueId) where T : NetworkObject;
 
         /// <summary>
-        /// Creates and registers and new network actor. Always create network-aware actors using
+        /// Creates and registers a new network object. Always create network-aware objects using
         /// this function.
         /// Leave <paramref name="overrideUniqueId"/> at -1 unless you know what you're doing.
         /// </summary>
         T SpawnNetworkObject<T>(IWirePacketSender? networkRelevantOnlyFor = null, long overrideUniqueId = -1) where T : NetworkObject;
 
         /// <summary>
-        /// Despawns the specified network actor
+        /// Despawns the specified network object
         /// </summary>
         void DespawnNetworkObject<T>(T actor) where T : NetworkObject;
+
+        /// <summary>
+        /// Creates and registers a new network actor. Always create network-aware actors using
+        /// this function.
+        /// Leave <paramref name="overrideUniqueId"/> at -1 unless you know what you're doing.
+        /// </summary>
+        T SpawnNetworkActor<T>(IWirePacketSender? networkRelevantOnlyFor = null, long overrideUniqueId = -1) where T : NetworkActor;
+
+        /// <summary>
+        /// Despawns the specified network object
+        /// </summary>
+        void DespawnNetworkActor<T>(T actor) where T : NetworkObject;
 
         /// <summary>
         /// Directly replicate the content to the client(s).
