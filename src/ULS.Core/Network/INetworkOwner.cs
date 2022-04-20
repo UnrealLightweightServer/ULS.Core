@@ -13,7 +13,7 @@ namespace ULS.Core
     public interface INetworkOwner
     {
         /// <summary>
-        /// Invoked when <see cref="SpawnNetworkActor{T}(long)"/> is called to return
+        /// Invoked when <see cref="SpawnNetworkObject{T}(long)"/> is called to return
         /// the next uniqueId.
         /// The implementation must ensure that each uniqueId is only given out once per session.
         /// </summary>
@@ -22,25 +22,25 @@ namespace ULS.Core
         /// <summary>
         /// Returns the network actor identified through the uniqueId
         /// </summary>
-        T? GetNetworkActor<T>(long uniqueId) where T : NetworkActor;
+        T? GetNetworkObject<T>(long uniqueId) where T : NetworkObject;
 
         /// <summary>
         /// Creates and registers and new network actor. Always create network-aware actors using
         /// this function.
         /// Leave <paramref name="overrideUniqueId"/> at -1 unless you know what you're doing.
         /// </summary>
-        T SpawnNetworkActor<T>(IWirePacketSender? networkRelevantOnlyFor = null, long overrideUniqueId = -1) where T : NetworkActor;
+        T SpawnNetworkObject<T>(IWirePacketSender? networkRelevantOnlyFor = null, long overrideUniqueId = -1) where T : NetworkObject;
 
         /// <summary>
         /// Despawns the specified network actor
         /// </summary>
-        void DespawnNetworkActor<T>(T actor) where T : NetworkActor;
+        void DespawnNetworkObject<T>(T actor) where T : NetworkObject;
 
         /// <summary>
         /// Directly replicate the content to the client(s).
         /// Wrap the byte array into a replication packet.
         /// </summary>
-        void ReplicateValueDirect(NetworkActor valueOwner, byte[] replicationData);
+        void ReplicateValueDirect(NetworkObject valueOwner, byte[] replicationData);
 
         /// <summary>
         /// Used to manually invoke a member replication. Should only be called by external

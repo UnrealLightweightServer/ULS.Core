@@ -153,7 +153,7 @@ public partial class ULSGenerator : ISourceGenerator
 
     private static bool IsNetworkActor(ITypeSymbol typeSymbol)
     {
-        if (typeSymbol.Name == "NetworkActor")
+        if (typeSymbol.Name == "NetworkObject")
         {
             return true;
         }
@@ -163,7 +163,7 @@ public partial class ULSGenerator : ISourceGenerator
         {
             return false;
         }
-        if (parent.Name == "NetworkActor")
+        if (parent.Name == "NetworkObject")
         {
             return true;
         }

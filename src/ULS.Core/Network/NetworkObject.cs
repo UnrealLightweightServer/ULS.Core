@@ -18,9 +18,9 @@ namespace ULS.Core
 
     /// <summary>
     /// Base class for all network-aware objects.
-    /// Replication and RPC calls will only work if the class is derived from NetworkActor
+    /// Replication and RPC calls will only work if the class is derived from NetworkObject
     /// </summary>
-    public abstract class NetworkActor
+    public abstract class NetworkObject
     {
         /// <summary>
         /// Unique network Id. Used to synchronize objects between the client and the server.
@@ -57,7 +57,7 @@ namespace ULS.Core
         /// Do not call explicitly.
         /// Only spawn network actors through SpawnNetworkActor<> of the INetworkOwner implementation
         /// </summary>
-        public NetworkActor(INetworkOwner setNetworkOwner, long overrideUniqueId)
+        public NetworkObject(INetworkOwner setNetworkOwner, long overrideUniqueId)
         {
             Owner = setNetworkOwner;
             if (overrideUniqueId == -1)
@@ -123,7 +123,7 @@ namespace ULS.Core
             // Base implementation does nothing            
         }
 
-        protected void SerializeRef(BinaryWriter writer, NetworkActor otherActor, string fieldName)
+        protected void SerializeRef(BinaryWriter writer, NetworkObject otherActor, string fieldName)
         {
             writer.Write((byte)ReplicatedFieldType.Reference);      // Ref
             writer.Write(Encoding.ASCII.GetByteCount(fieldName));
@@ -138,17 +138,17 @@ namespace ULS.Core
             }
         }
 
-        public T? DeserializeRef<T>(BinaryReader reader, INetworkOwner networkOwner) where T : NetworkActor
+        public T? DeserializeRef<T>(BinaryReader reader, INetworkOwner networkOwner) where T : NetworkObject
         {
             long refUniqueId = reader.ReadInt64();
             if (refUniqueId == -1)
             {
                 return null;
             }
-            return networkOwner.GetNetworkActor<T>(refUniqueId);
+            return networkOwner.GetNetworkObject<T>(refUniqueId);
         }
 
-        public T? DeserializeRefWithMetadata<T>(BinaryReader reader, INetworkOwner networkOwner) where T : NetworkActor
+        public T? DeserializeRefWithMetadata<T>(BinaryReader reader, INetworkOwner networkOwner) where T : NetworkObject
         {
             byte type = reader.ReadByte();
             string fieldName = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadInt32()));

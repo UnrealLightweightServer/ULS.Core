@@ -75,11 +75,11 @@ namespace ULS.CodeGen
         {
             foreach (var pair in receiver.ReplicationMembers)
             {
-                bool isSubC = IsSubclassOf(pair.Key, "NetworkActor");
+                bool isSubC = IsNetworkActor(pair.Key);
                 if (isSubC == false)
                 {
                     context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                        Code_ReplicationTypeNetworkActor, "", "Classes using Replicated properties or fields must be derived from NetworkActor",
+                        Code_ReplicationTypeNetworkActor, "", "Classes using Replicated properties or fields must be derived from NetworkObject",
                         "", DiagnosticSeverity.Error, true),
                         pair.Key.Locations.Length > 0 ? pair.Key.Locations[0] : null));
                     return false;
@@ -388,7 +388,7 @@ namespace ULS.CodeGen
                     return $"SerializeVector3(writer, {symbolName}, \"{symbolName}\")";
             }
 
-            if (IsSubclassOf(symbolType, "NetworkActor"))
+            if (IsSubclassOf(symbolType, "NetworkObject"))
             {
                 return $"SerializeRef(writer, {symbolName}, \"{symbolName}\")";
             }
@@ -506,7 +506,7 @@ namespace ULS.CodeGen
             foreach (var item in receiver.RpcCallsNoNetworkActor)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                    Code_RpcCallNoNetworkActor, "", "RpcCalls can only be used in classes derived from NetworkActor",
+                    Code_RpcCallNoNetworkActor, "", "RpcCalls can only be used in classes derived from NetworkObject",
                     "", DiagnosticSeverity.Error, true),
                     item.Locations.Length > 0 ? item.Locations[0] : null));
             }
@@ -631,7 +631,7 @@ namespace ULS.CodeGen
                     return $"SerializeVector3(writer, {symbolName}, \"{symbolName}\")";
             }
 
-            if (IsSubclassOf(symbolType, "NetworkActor"))
+            if (IsSubclassOf(symbolType, "NetworkObject"))
             {
                 return $"SerializeRef(writer, {symbolName}, \"{symbolName}\")";
             }
