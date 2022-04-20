@@ -75,11 +75,11 @@ namespace ULS.CodeGen
         {
             foreach (var pair in receiver.ReplicationMembers)
             {
-                bool isSubC = IsNetworkActor(pair.Key);
+                bool isSubC = IsNetworkObject(pair.Key);
                 if (isSubC == false)
                 {
                     context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                        Code_ReplicationTypeNetworkActor, "", "Classes using Replicated properties or fields must be derived from NetworkObject",
+                        Code_ReplicationTypeNetworkObject, "", "Classes using Replicated properties or fields must be derived from NetworkObject",
                         "", DiagnosticSeverity.Error, true),
                         pair.Key.Locations.Length > 0 ? pair.Key.Locations[0] : null));
                     return false;
@@ -243,7 +243,7 @@ namespace ULS.CodeGen
             }
             if (defAttrib.ReplicationStrategy == ReplicationStrategy.Automatic)
             {
-                isImmediate = IsNetworkActor(field.Type);
+                isImmediate = IsNetworkObject(field.Type);
             }
             var attribs = field.GetAttributes();
             foreach (var attr in attribs)
@@ -261,7 +261,7 @@ namespace ULS.CodeGen
                                     switch (strat)
                                     {
                                         case ReplicationStrategy.Automatic:
-                                            isImmediate = IsNetworkActor(field.Type);
+                                            isImmediate = IsNetworkObject(field.Type);
                                             break;
                                         case ReplicationStrategy.Manual:
                                             isImmediate = false;
@@ -315,7 +315,7 @@ namespace ULS.CodeGen
                     return "System.Numerics.Vector3.Zero";
             }
 
-            if (IsNetworkActor(symbolType))
+            if (IsNetworkObject(symbolType))
             {
                 return $"null";
             }
@@ -346,7 +346,7 @@ namespace ULS.CodeGen
                     return $"DeserializeVector3(reader)";
             }
 
-            if (IsNetworkActor(symbolType))
+            if (IsNetworkObject(symbolType))
             {
                 var symbolTypeString = symbolType.ToString();
                 if (symbolTypeString.EndsWith("?"))
@@ -388,7 +388,7 @@ namespace ULS.CodeGen
                     return $"SerializeVector3(writer, {symbolName}, \"{symbolName}\")";
             }
 
-            if (IsSubclassOf(symbolType, "NetworkObject"))
+            if (IsNetworkObject(symbolType))
             {
                 return $"SerializeRef(writer, {symbolName}, \"{symbolName}\")";
             }
@@ -497,16 +497,16 @@ namespace ULS.CodeGen
         #region RPC calls
         private bool ValidateRpcCallTypes(GeneratorExecutionContext context, SyntaxReceiver receiver)
         {
-            if (receiver.RpcCallsNoNetworkActor.Count == 0 &&
+            if (receiver.RpcCallsNoNetworkObject.Count == 0 &&
                 receiver.RpcCallNotPartialTypes.Count == 0)
             {
                 return true;
             }
 
-            foreach (var item in receiver.RpcCallsNoNetworkActor)
+            foreach (var item in receiver.RpcCallsNoNetworkObject)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                    Code_RpcCallNoNetworkActor, "", "RpcCalls can only be used in classes derived from NetworkObject",
+                    Code_RpcCallNoNetworkObject, "", "RpcCalls can only be used in classes derived from NetworkObject",
                     "", DiagnosticSeverity.Error, true),
                     item.Locations.Length > 0 ? item.Locations[0] : null));
             }
@@ -631,7 +631,7 @@ namespace ULS.CodeGen
                     return $"SerializeVector3(writer, {symbolName}, \"{symbolName}\")";
             }
 
-            if (IsSubclassOf(symbolType, "NetworkObject"))
+            if (IsNetworkObject(symbolType))
             {
                 return $"SerializeRef(writer, {symbolName}, \"{symbolName}\")";
             }
@@ -668,7 +668,7 @@ namespace ULS.CodeGen
                     return $"DeserializeVector3WithMetadata(reader)";
             }
 
-            if (IsNetworkActor(symbolType))
+            if (IsNetworkObject(symbolType))
             {
                 var symbolTypeString = symbolType.ToString();
                 if (symbolTypeString.EndsWith("?"))

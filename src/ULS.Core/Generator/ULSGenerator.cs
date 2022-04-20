@@ -29,14 +29,14 @@ public partial class ULSGenerator : ISourceGenerator
 
     internal const string Code_ClientIRpcTargetInterface = "UR0010";
 
-    internal const string Code_ReplicationTypeNetworkActor = "UR0011";
+    internal const string Code_ReplicationTypeNetworkObject = "UR0011";
     internal const string Code_ReplicationTypeNotPartial = "UR0012";
     internal const string Code_ReplicationInvalidPropertyType = "UR0013";
     internal const string Code_ReplicationTypeNotPrivate = "UR0014";
 
     internal const string Code_InvalidParam = "UR0020";
 
-    internal const string Code_RpcCallNoNetworkActor = "UR0030";
+    internal const string Code_RpcCallNoNetworkObject = "UR0030";
     internal const string Code_RpcCallNotPartialType = "UR0031";
 
     internal const string Code_GeneratorFailure = "UR0900";
@@ -137,21 +137,7 @@ public partial class ULSGenerator : ISourceGenerator
         }
     }
 
-    private static bool IsSubclassOf(ITypeSymbol typeSymbol, string name)
-    {
-        var parent = typeSymbol.BaseType;
-        if (parent == null)
-        {
-            return false;
-        }
-        if (parent.Name == name)
-        {
-            return true;
-        }
-        return IsSubclassOf(parent, name);
-    }
-
-    private static bool IsNetworkActor(ITypeSymbol typeSymbol)
+    private static bool IsNetworkObject(ITypeSymbol typeSymbol)
     {
         if (typeSymbol.Name == "NetworkObject")
         {
@@ -167,7 +153,7 @@ public partial class ULSGenerator : ISourceGenerator
         {
             return true;
         }
-        return IsNetworkActor(parent);
+        return IsNetworkObject(parent);
     }
 
     /// <summary>
@@ -177,13 +163,13 @@ public partial class ULSGenerator : ISourceGenerator
     {
         public UnrealProjectAttribute? UnrealProject { get; set; } = null;
 
-#region Error cases
+        #region Error cases
         public List<IFieldSymbol> ReplicationFieldsNotPrivate = new List<IFieldSymbol>();
         public List<INamedTypeSymbol> ReplicationMembersNotPartialTypes = new List<INamedTypeSymbol>();
-        public List<IMethodSymbol> RpcCallsNoNetworkActor = new List<IMethodSymbol>();
+        public List<IMethodSymbol> RpcCallsNoNetworkObject = new List<IMethodSymbol>();
         public List<INamedTypeSymbol> RpcCallNotPartialTypes = new List<INamedTypeSymbol>();
         public List<IEventSymbol> RpcEventsUsingCallStrategy = new List<IEventSymbol>();
-#endregion
+        #endregion
 
         public Dictionary<INamedTypeSymbol, List<IFieldSymbol>> ReplicationMembers = new Dictionary<INamedTypeSymbol, List<IFieldSymbol>>();
 
@@ -418,9 +404,9 @@ public partial class ULSGenerator : ISourceGenerator
                     attr.AttributeClass.ToDisplayString().EndsWith("RpcCallAttribute"))
                 {
                     var outerType = ms.ContainingType;
-                    if (IsNetworkActor(outerType) == false)
+                    if (IsNetworkObject(outerType) == false)
                     {
-                        RpcCallsNoNetworkActor.Add(ms);
+                        RpcCallsNoNetworkObject.Add(ms);
                         return;
                     }
 

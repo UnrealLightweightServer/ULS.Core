@@ -55,7 +55,7 @@ namespace ULS.Core
 
         /// <summary>
         /// Do not call explicitly.
-        /// Only spawn network actors through SpawnNetworkActor<> of the INetworkOwner implementation
+        /// Only spawn network objects through SpawnNetworkObject<> of the INetworkOwner implementation
         /// </summary>
         public NetworkObject(INetworkOwner setNetworkOwner, long overrideUniqueId)
         {

@@ -455,7 +455,7 @@ namespace ULS.CodeGen
 
         private static string GetUnrealSerializeSizeFunction(IParameterSymbol paramSymbol)
         {
-            if (IsNetworkActor(paramSymbol.Type) == true)
+            if (IsNetworkObject(paramSymbol.Type) == true)
             {
                 return "GetSerializeRefParameterSize";
             }
@@ -492,7 +492,7 @@ namespace ULS.CodeGen
 
         private static string GetUnrealSerializeParameterFunction(IParameterSymbol paramSymbol)
         {
-            if (IsNetworkActor(paramSymbol.Type) == true)
+            if (IsNetworkObject(paramSymbol.Type) == true)
             {
                 return "SerializeRefParameter";
             }
@@ -529,7 +529,7 @@ namespace ULS.CodeGen
 
         private static string GetUnrealDeserializeFunction(IParameterSymbol paramSymbol)
         {
-            if (IsNetworkActor(paramSymbol.Type) == true)
+            if (IsNetworkObject(paramSymbol.Type) == true)
             {
                 return "DeserializeRef";
             }
@@ -566,7 +566,7 @@ namespace ULS.CodeGen
 
         private static string GetUnrealDeserializeParameterFunction(IParameterSymbol paramSymbol)
         {
-            if (IsNetworkActor(paramSymbol.Type) == true)
+            if (IsNetworkObject(paramSymbol.Type) == true)
             {
                 return "DeserializeRefParameter";
             }
@@ -603,7 +603,7 @@ namespace ULS.CodeGen
 
         private string GetUnrealReturnType(ITypeSymbol type)
         {
-            if (IsNetworkActor(type) == true)
+            if (IsNetworkObject(type) == true)
             {
                 return "AActor*";
             }
@@ -630,7 +630,7 @@ namespace ULS.CodeGen
 
         private string GetUnrealParameterType(ITypeSymbol type)
         {
-            if (IsNetworkActor(type) == true)
+            if (IsNetworkObject(type) == true)
             {
                 return "const AActor*";
             }
@@ -667,7 +667,7 @@ namespace ULS.CodeGen
 
         private string GetUnrealParameterDefaultValueType(ITypeSymbol type)
         {
-            if (IsNetworkActor(type) == true)
+            if (IsNetworkObject(type) == true)
             {
                 return "nullptr";
             }
