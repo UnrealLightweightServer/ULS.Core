@@ -39,6 +39,9 @@ public partial class ULSGenerator : ISourceGenerator
     internal const string Code_RpcCallNoNetworkObject = "UR0030";
     internal const string Code_RpcCallNotPartialType = "UR0031";
 
+    internal const string Code_SpawnFunctionNoActor = "UR0040";
+    internal const string Code_SpawnFunctionNoObject = "UR0041";
+
     internal const string Code_GeneratorFailure = "UR0900";
 
 #if SIMPLE_LOGGING
@@ -156,6 +159,25 @@ public partial class ULSGenerator : ISourceGenerator
         return IsNetworkObject(parent);
     }
 
+    private static bool IsNetworkActor(ITypeSymbol typeSymbol)
+    {
+        if (typeSymbol.Name == "NetworkActor")
+        {
+            return true;
+        }
+
+        var parent = typeSymbol.BaseType;
+        if (parent == null)
+        {
+            return false;
+        }
+        if (parent.Name == "NetworkActor")
+        {
+            return true;
+        }
+        return IsNetworkActor(parent);
+    }
+
     /// <summary>
     /// Created on demand before each generation pass
     /// </summary>
@@ -170,6 +192,9 @@ public partial class ULSGenerator : ISourceGenerator
         public List<INamedTypeSymbol> RpcCallNotPartialTypes = new List<INamedTypeSymbol>();
         public List<IEventSymbol> RpcEventsUsingCallStrategy = new List<IEventSymbol>();
         #endregion
+
+        public List<InvocationExpressionSyntax> IncorrectSpawnActors = new List<InvocationExpressionSyntax>();
+        public List<InvocationExpressionSyntax> IncorrectSpawnObjects = new List<InvocationExpressionSyntax>();
 
         public Dictionary<INamedTypeSymbol, List<IFieldSymbol>> ReplicationMembers = new Dictionary<INamedTypeSymbol, List<IFieldSymbol>>();
 
@@ -213,10 +238,38 @@ public partial class ULSGenerator : ISourceGenerator
                 {
                     HandleField(context, fds);
                 }
+
+                if (context.Node is InvocationExpressionSyntax ies)
+                {
+                    HandleInvocation(context, ies);
+                }
             }
             catch (Exception ex)
             {
                 Log("EXCEPTION VISIT: " + ex);
+            }
+        }
+
+        private void HandleInvocation(GeneratorSyntaxContext context, InvocationExpressionSyntax ies)
+        {
+            var symbol = context.SemanticModel.GetSymbolInfo(ies);
+            if (symbol.Symbol is IMethodSymbol ms)
+            {
+                var name = ms.Name;
+                if (name == nameof(INetworkOwner.SpawnNetworkActor))
+                {
+                    if (IsNetworkActor(ms.ReturnType) == false)
+                    {
+                        IncorrectSpawnActors.Add(ies);                            
+                    }
+                }
+                if (name == nameof(INetworkOwner.SpawnNetworkObject))
+                {
+                    if (IsNetworkActor(ms.ReturnType))
+                    {
+                        IncorrectSpawnObjects.Add(ies);                            
+                    }
+                }
             }
         }
 

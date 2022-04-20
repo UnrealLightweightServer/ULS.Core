@@ -25,6 +25,10 @@ namespace ULS.CodeGen
                     "", DiagnosticSeverity.Warning, true), null));
                 return false;
             }
+            if (ValidateSpawnFunctions(context, receiver) == false)
+            {
+                return false;
+            }
 
             foreach (var pair in receiver.ReplicationMembers)
             {
@@ -68,6 +72,36 @@ namespace ULS.CodeGen
             }
 
             return true;
+        }
+
+        private bool ValidateSpawnFunctions(GeneratorExecutionContext context, SyntaxReceiver receiver)
+        {
+            if (receiver.IncorrectSpawnActors.Count == 0 && receiver.IncorrectSpawnObjects.Count == 0)
+            {
+                return true;
+            }
+
+            foreach (var item in receiver.IncorrectSpawnObjects)
+            {
+                var d = Diagnostic.Create(new DiagnosticDescriptor(
+                        Code_SpawnFunctionNoObject, "",
+                        "SpawnNetworkObject must not be used on types derived from NetworkActor. Use SpawnNetworkActor instead.", "",
+                        DiagnosticSeverity.Error, true
+                    ), item.GetLocation(), item.ToString());
+                context.ReportDiagnostic(d);
+            }
+
+            foreach (var item in receiver.IncorrectSpawnActors)
+            {
+                var d = Diagnostic.Create(new DiagnosticDescriptor(
+                        Code_SpawnFunctionNoActor, "",
+                        "SpawnNetworkActor may only be used on types derived from NetworkActor. Use SpawnNetworkObject instead.", "",
+                        DiagnosticSeverity.Error, true
+                    ), item.GetLocation(), item.ToString());
+                context.ReportDiagnostic(d);
+            }
+
+            return false;
         }
 
         #region Replicated properties

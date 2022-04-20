@@ -34,7 +34,7 @@ namespace ULS.Core
         /// <summary>
         /// Despawns the specified network object
         /// </summary>
-        void DespawnNetworkObject<T>(T actor) where T : NetworkObject;
+        void DespawnNetworkObject<T>(T networkObject) where T : NetworkObject;
 
         /// <summary>
         /// Creates and registers a new network actor. Always create network-aware actors using
@@ -46,7 +46,7 @@ namespace ULS.Core
         /// <summary>
         /// Despawns the specified network object
         /// </summary>
-        void DespawnNetworkActor<T>(T actor) where T : NetworkObject;
+        void DespawnNetworkActor<T>(T actor) where T : NetworkActor;
 
         /// <summary>
         /// Directly replicate the content to the client(s).
