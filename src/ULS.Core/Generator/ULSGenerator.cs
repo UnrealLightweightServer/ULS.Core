@@ -39,6 +39,8 @@ public partial class ULSGenerator : ISourceGenerator
     internal const string Code_RpcCallNoNetworkActor = "UR0030";
     internal const string Code_RpcCallNotPartialType = "UR0031";
 
+    internal const string Code_GeneratorFailure = "UR0900";
+
 #if SIMPLE_LOGGING
     internal static string logFile = "D:\\Temp\\codegen_log_2.txt";
 
@@ -83,13 +85,19 @@ public partial class ULSGenerator : ISourceGenerator
             // retrieve the populated receiver 
             if (!(context.SyntaxContextReceiver is SyntaxReceiver receiver))
             {
+                context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                    Code_GeneratorFailure, "", "Internal error in source generator (invalid SyntaxContextReceiver)",
+                    "", DiagnosticSeverity.Error, true), null));
                 return;
             }
 
             Log("BEGIN Execute C#");
             if (GenerateCSharpClasses(context, receiver) == false)
             {
-                return;
+                context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                    Code_GeneratorFailure, "", "Failed to generate C# server code (see previous errors)",
+                    "", DiagnosticSeverity.Warning, true), null));
+                Log("Failed to generate C# code");
             }
             Log("END Execute C#");
 
@@ -107,6 +115,9 @@ public partial class ULSGenerator : ISourceGenerator
         }
         catch (Exception ex)
         {
+            context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                Code_GeneratorFailure, "", "Failed to execute code generator: " + ex,
+                "", DiagnosticSeverity.Error, true), null));
             Log("ERROR Execute: " + ex);
         }
     }
@@ -178,7 +189,7 @@ public partial class ULSGenerator : ISourceGenerator
 
         public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> RpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
         public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> UnrealGeneratedRpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
-        public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> UnrealReflectedRpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
+        public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> UnrealPartialReflRpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
         public Dictionary<INamedTypeSymbol, List<IEventSymbol>> RpcEventsByType { get; } = new Dictionary<INamedTypeSymbol, List<IEventSymbol>>();
         public Dictionary<IEventSymbol, string[]> RpcEventParameterNameLookup { get; } = new Dictionary<IEventSymbol, string[]>();
 
@@ -451,16 +462,20 @@ public partial class ULSGenerator : ISourceGenerator
                                 theList.Add(ms);
                             }
                             break;
-                        case CallStrategy.Reflection:
+                        case CallStrategy.PartialReflection:
                             {
                                 List<IMethodSymbol> theList;
-                                if (UnrealReflectedRpcMethodsByType.TryGetValue(outerType, out theList) == false)
+                                if (UnrealPartialReflRpcMethodsByType.TryGetValue(outerType, out theList) == false)
                                 {
                                     theList = new List<IMethodSymbol>();
-                                    UnrealReflectedRpcMethodsByType[outerType] = theList;
+                                    UnrealPartialReflRpcMethodsByType[outerType] = theList;
                                 }
                                 theList.Add(ms);
                             }
+                            break;
+                        case CallStrategy.FullReflection:
+                            // Nothing to do here, this will only be checked by the server generated code
+                            // and that will look directly into RpcMethodsByType
                             break;
                     }
 

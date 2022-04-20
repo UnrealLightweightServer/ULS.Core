@@ -6,7 +6,7 @@ namespace ULS.Core
 {
     public enum WirePacketType : int
     {
-        ConnectionRequest = 0,          // Sent by client. Request to establisch connection. Followed by ConnectionResponse
+        ConnectionRequest = 0,          // Sent by client. Request to establish connection. Followed by ConnectionResponse
         ConnectionResponse = 1,         // Sent by server upon receiving a ConnectionRequest. Contains "success true/false"
         ConnectionEnd = 2,              // Sent by server when the connection is closed gracefully from the server side (i.e. when the "world" is shut down)
 

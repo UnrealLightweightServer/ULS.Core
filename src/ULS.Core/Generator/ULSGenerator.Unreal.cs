@@ -32,19 +32,19 @@ namespace ULS.CodeGen
                 }
 
                 // Get Methods for this class (Server To Client, Generated code)
-                List<IMethodSymbol> methods = new List<IMethodSymbol>();
+                List<IMethodSymbol> gen_methods = new List<IMethodSymbol>();
                 foreach (var pair in receiver.UnrealGeneratedRpcMethodsByType)
                 {
-                    methods.AddRange(pair.Value);
+                    gen_methods.AddRange(pair.Value);
                 }
-                // Get Methods for this class (Server To Client, Reflected code)
+                // Get Methods for this class (Server To Client, PartialReflected code)
                 List<IMethodSymbol> refl_methods = new List<IMethodSymbol>();
-                foreach (var pair in receiver.UnrealReflectedRpcMethodsByType)
+                foreach (var pair in receiver.UnrealPartialReflRpcMethodsByType)
                 {
                     refl_methods.AddRange(pair.Value);
                 }
-                GenerateHeaderDataForMethods(context, methods, hdrFile);
-                GenerateImplementationDataForMethods(context, methods, refl_methods, srcFile);
+                GenerateHeaderDataForMethods(context, gen_methods, hdrFile);
+                GenerateImplementationDataForMethods(context, gen_methods, refl_methods, srcFile);
 
                 // Get Events for this class (Client To Server)
                 List<IEventSymbol> events = new List<IEventSymbol>();

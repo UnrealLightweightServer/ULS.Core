@@ -13,12 +13,16 @@ namespace ULS.CodeGen
         {
             if (ValidateReplicationTypes(context, receiver) == false)
             {
-                // TODO: Add warning
+                context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                    Code_GeneratorFailure, "", "Failed to validate replication types during C# code generation (see previous errors)",
+                    "", DiagnosticSeverity.Warning, true), null));
                 return false;
             }
             if (ValidateRpcCallTypes(context, receiver) == false)
             {
-                // TODO: Add warning
+                context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
+                    Code_GeneratorFailure, "", "Failed to validate rpc call types during C# code generation (see previous errors)",
+                    "", DiagnosticSeverity.Warning, true), null));
                 return false;
             }
 
@@ -295,9 +299,12 @@ namespace ULS.CodeGen
         {
             switch (symbolType.ToString())
             {
+                case "byte":
+                case "short":
                 case "int":
                 case "long":
                 case "float":
+                case "double":
                 case "bool":
                     return $"default({symbolType})";
 
@@ -321,12 +328,16 @@ namespace ULS.CodeGen
             ITypeSymbol symbolType = field.Type;
             switch (symbolType.ToString())
             {
+                case "byte":
                 case "short":
                 case "int":
                 case "long":
-                case "float":
                 case "bool":
-                    return $"DeserializeValue<{symbolType}>(reader)";
+                    return $"DeserializePrimitiveInt<{symbolType}>(reader)";
+
+                case "float":
+                case "double":
+                    return $"DeserializePrimitiveFloat<{symbolType}>(reader)";
 
                 case "string":
                     return $"DeserializeString(reader)";
@@ -359,12 +370,16 @@ namespace ULS.CodeGen
             string symbolName = GetReplicationFieldReplicationName(field);
             switch (symbolType.ToString())
             {
+                case "byte":
                 case "short":
                 case "int":
                 case "long":
-                case "float":
                 case "bool":
-                    return $"SerializeValue<{symbolType}>(writer, {symbolName}, \"{symbolName}\")";
+                    return $"SerializePrimitiveInt<{symbolType}>(writer, {symbolName}, \"{symbolName}\")";
+
+                case "float":
+                case "double":
+                    return $"SerializePrimitiveFloat<{symbolType}>(writer, {symbolName}, \"{symbolName}\")";
 
                 case "string":
                     return $"SerializeString(writer, {symbolName}, \"{symbolName}\")";
@@ -488,7 +503,7 @@ namespace ULS.CodeGen
                 return true;
             }
 
-            foreach (var item in receiver.ReplicationFieldsNotPrivate)
+            foreach (var item in receiver.RpcCallsNoNetworkActor)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
                     Code_RpcCallNoNetworkActor, "", "RpcCalls can only be used in classes derived from NetworkActor",
@@ -530,11 +545,41 @@ namespace ULS.CodeGen
                     paramString += item.Parameters[i].Type.ToDisplayString() + " " + item.Parameters[i].Name;
                 }
 
+                RpcCallAttribute defaultAttrib = new RpcCallAttribute();
+                CallStrategy callStrategyToUse = defaultAttrib.CallStrategy;
+
+                var attribs = item.GetAttributes();
+                foreach (var attrib in attribs)
+                {
+                    if (attrib.AttributeClass != null &&
+                        attrib.AttributeClass.ToDisplayString().EndsWith(nameof(RpcCallAttribute)))
+                    {
+                        foreach (var attrData in attrib.NamedArguments)
+                        {
+                            switch (attrData.Key)
+                            {
+                                case "CallStrategy":
+                                    {
+                                        callStrategyToUse = (CallStrategy)attrData.Value.Value;
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+                }
+
+                int flags = 0;
+                if (callStrategyToUse == CallStrategy.FullReflection)
+                {
+                    // TODO: Use strongly typed enum flags
+                    flags |= 1 << 0;
+                }
+
                 sb.AppendLine($"      public partial {GetReturnType(item)} {item.Name}({paramString})");
                 sb.AppendLine($"      {{");
                 sb.AppendLine($"         MemoryStream ms = new MemoryStream();");
                 sb.AppendLine($"         BinaryWriter writer = new BinaryWriter(ms);");
-                sb.AppendLine($"         writer.Write((int)0);              // flags");
+                sb.AppendLine($"         writer.Write((int){flags});              // flags");
                 sb.AppendLine($"         writer.Write(this.UniqueId);");
                 sb.AppendLine($"         writer.Write(Encoding.UTF8.GetByteCount(\"{item.Name}\"));");
                 sb.AppendLine($"         writer.Write(Encoding.UTF8.GetBytes(\"{item.Name}\"));");
@@ -568,12 +613,16 @@ namespace ULS.CodeGen
             string symbolName = serializedParamName;
             switch (symbolType.ToString())
             {
+                case "byte":
                 case "short":
                 case "int":
                 case "long":
-                case "float":
                 case "bool":
-                    return $"SerializeValue<{symbolType}>(writer, {symbolName}, \"{symbolName}\")";
+                    return $"SerializePrimitiveInt<{symbolType}>(writer, {symbolName}, \"{symbolName}\")";
+
+                case "float":
+                case "double":
+                    return $"SerializePrimitiveFloat<{symbolType}>(writer, {symbolName}, \"{symbolName}\")";
 
                 case "string":
                     return $"SerializeString(writer, {symbolName}, \"{symbolName}\")";
@@ -601,12 +650,16 @@ namespace ULS.CodeGen
             string symbolName = param.Name;
             switch (symbolType.ToString())
             {
+                case "byte":
                 case "short":
                 case "int":
                 case "long":
-                case "float":
                 case "bool":
-                    return $"DeserializeValueWithMetadata<{symbolType}>(reader)";
+                    return $"DeserializePrimitiveIntWithMetadata<{symbolType}>(reader)";
+
+                case "float":
+                case "double":
+                    return $"DeserializePrimitiveFloatWithMetadata<{symbolType}>(reader)";
 
                 case "string":
                     return $"DeserializeStringWithMetadata(reader)";
