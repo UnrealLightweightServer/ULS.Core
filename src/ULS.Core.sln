@@ -5,8 +5,6 @@ VisualStudioVersion = 17.0.32014.148
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ULS.Core", "ULS.Core\ULS.Core.csproj", "{C2C32E57-1933-438C-BC12-10091CB9C58E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ULS.CodeGen", "ULS.CodeGen\ULS.CodeGen.csproj", "{2BC4D7D9-8568-4C5E-AE10-F37558001A25}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -17,10 +15,6 @@ Global
 		{C2C32E57-1933-438C-BC12-10091CB9C58E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C2C32E57-1933-438C-BC12-10091CB9C58E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C2C32E57-1933-438C-BC12-10091CB9C58E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2BC4D7D9-8568-4C5E-AE10-F37558001A25}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2BC4D7D9-8568-4C5E-AE10-F37558001A25}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2BC4D7D9-8568-4C5E-AE10-F37558001A25}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2BC4D7D9-8568-4C5E-AE10-F37558001A25}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
