@@ -71,7 +71,7 @@ namespace ULS.CodeGen
             foreach (var item in methods)
             {
                 sb.AppendLine("\tUFUNCTION(BlueprintImplementableEvent, Category = Rpc)");
-                sb.Append($"\t\t{GetUnrealReturnType(item.ReturnType)} {item.Name}(const AActor* callee");
+                sb.Append($"\t\t{GetUnrealReturnType(item.ReturnType)} {item.Name}(const UObject* callee");
                 for (int i = 0; i < item.Parameters.Length; i++)
                 {
                     sb.Append(", ");
@@ -103,12 +103,12 @@ namespace ULS.CodeGen
                 sb.AppendLine($"\t// {item.Name}");
                 sb.AppendLine($"\tif (methodName == TEXT(\"{item.Name}\"))");
                 sb.AppendLine($"\t{{");
-                sb.AppendLine($"\t\tauto cls = existingActor->GetClass();");
+                sb.AppendLine($"\t\tauto cls = existingObject->GetClass();");
                 sb.AppendLine($"\t\tUFunction* function = cls->FindFunctionByName(FName(TEXT(\"{item.Name}\")));");
                 sb.AppendLine($"\t\tif (IsValid(function) == false)");
                 sb.AppendLine($"\t\t{{");
                 sb.AppendLine($"\t\t\t// TODO: Log properly");
-                sb.AppendLine($"\t\t\tUE_LOG(LogTemp, Error, TEXT(\"Failed to call function {item.Name} on actor of type %s with uniqueId: %ld\"), *cls->GetName(), FindUniqueId(existingActor));");
+                sb.AppendLine($"\t\t\tUE_LOG(LogTemp, Error, TEXT(\"Failed to call function {item.Name} on object of type %s with uniqueId: %ld\"), *cls->GetName(), FindUniqueId(existingObject));");
                 sb.AppendLine($"\t\t\treturn;");
                 sb.AppendLine($"\t\t}}");
                 sb.AppendLine($"\t\tstruct");
@@ -123,7 +123,7 @@ namespace ULS.CodeGen
                     sb.AppendLine($"\t\tFuncParams.param_{item.Name}_{i} = " +
                         GetUnrealDeserializeParameterFunction(item.Parameters[i]) + "(packet, position, position);");
                 }
-                sb.AppendLine($"\t\texistingActor->ProcessEvent(function, &FuncParams);");
+                sb.AppendLine($"\t\texistingObject->ProcessEvent(function, &FuncParams);");
                 sb.AppendLine($"\t\treturn;");
                 sb.AppendLine($"\t}}");
                 sb.AppendLine($"\t");
@@ -141,7 +141,7 @@ namespace ULS.CodeGen
                         GetUnrealDeserializeParameterFunction(item.Parameters[i]) + "(packet, position, position);");
                 }
 
-                sb.Append($"\t\t{item.Name}(existingActor");
+                sb.Append($"\t\t{item.Name}(existingObject");
                 for (int i = 0; i < item.Parameters.Length; i++)
                 {
                     sb.Append(", ");
@@ -222,7 +222,7 @@ namespace ULS.CodeGen
                         {
                             callerName = GetEventParameterName(item, 0, eventParameterNameLookup);
                         }
-                        sb.Append($"\t\tvoid Server_{GetEventName(item)}(AActor* " + callerName);
+                        sb.Append($"\t\tvoid Server_{GetEventName(item)}(UObject* " + callerName);
 
                         // Skip first, which is the Controller itself
                         for (int j = 1; j < ms.Parameters.Length; j++)
@@ -264,7 +264,7 @@ namespace ULS.CodeGen
                         {
                             callerName = GetEventParameterName(item, 0, eventParameterNameLookup);
                         }
-                        sb.Append($"void {unrealClassName}::Server_{GetEventName(item)}(AActor* " + callerName);
+                        sb.Append($"void {unrealClassName}::Server_{GetEventName(item)}(UObject* " + callerName);
 
                         var ms = members[i] as IMethodSymbol;
                         if (ms == null)
@@ -605,7 +605,7 @@ namespace ULS.CodeGen
         {
             if (IsNetworkObject(type) == true)
             {
-                return "AActor*";
+                return "UObject*";
             }
 
             string csharpType = type.ToString();
@@ -632,7 +632,7 @@ namespace ULS.CodeGen
         {
             if (IsNetworkObject(type) == true)
             {
-                return "const AActor*";
+                return "const UObject*";
             }
 
             string csharpType = type.ToString();
