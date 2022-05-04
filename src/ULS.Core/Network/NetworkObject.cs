@@ -29,6 +29,12 @@ namespace ULS.Core
         public long UniqueId { get; private set; }
 
         /// <summary>
+        /// Whether this object is linked to the client object. Is always true unless TearOff() is called.
+        /// Unlinked objects will not send any RPC or replication messages. 
+        /// </summary>
+        public bool IsLinked { get; private set; }
+
+        /// <summary>
         /// Public reference to the INetworkOwner
         /// </summary>
         public INetworkOwner Owner { get; private set; }
@@ -59,6 +65,7 @@ namespace ULS.Core
         /// </summary>
         public NetworkObject(INetworkOwner setNetworkOwner, long overrideUniqueId)
         {
+            IsLinked = true;
             Owner = setNetworkOwner;
             if (overrideUniqueId == -1)
             {
@@ -85,6 +92,11 @@ namespace ULS.Core
 
         public bool ReplicateValues(BinaryWriter writer, bool forced)
         {
+            if (IsLinked == false)
+            {
+                return false;
+            }
+
             writer.Write((int)0);       // flags
             writer.Write(UniqueId);
             long pos = writer.BaseStream.Position;
@@ -293,6 +305,11 @@ namespace ULS.Core
 
         public bool ShouldSendTo(IWirePacketSender? relevantTarget)
         {
+            if (IsLinked == false)
+            {
+                return false;
+            }
+
             if (NetworkRelevantOnlyFor == null)
             {
                 return true;
@@ -303,6 +320,11 @@ namespace ULS.Core
 
         public void ProcessRpcMethod(BinaryReader reader)
         {
+            if (IsLinked == false)
+            {
+                return;
+            }
+
             ProcessRpcMethodInternal(reader);
         }
 
@@ -313,12 +335,23 @@ namespace ULS.Core
 
         public void Client_ProcessRpcMethod(BinaryReader reader)
         {
+            if (IsLinked == false)
+            {
+                return;
+            }
+
             Client_ProcessRpcMethodInternal(reader);
         }
 
         protected virtual void Client_ProcessRpcMethodInternal(BinaryReader reader)
         {
             // 
+        }
+
+        public void TearOff()
+        {
+            IsLinked = false;
+            Owner?.TearOffObject(this);
         }
     }
 }

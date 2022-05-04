@@ -17,6 +17,7 @@ namespace ULS.Core
         DestroyObject = 114,            // Destroy a UObject based object on the client. Sent by the server only.
         RpcCall = 115,                  // Serialized RpcCall. Can be sent by both parties.
         RpcCallResponse = 116,          // Serialized response to an RpcCall. Can be sent by both parties.
+        TearOff = 117,                  // Server has torn off the link between the server and client object. No more messages will be sent for this object after this message.
 
         Custom = 200,                   // Custom, user-specific data. Ignored in low-level operations
     }

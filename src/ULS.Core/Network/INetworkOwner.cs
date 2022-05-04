@@ -64,5 +64,11 @@ namespace ULS.Core
         /// Send RPC call to the specified target or all known targets if target is null
         /// </summary>
         void SendRpc(IWirePacketSender? target, byte[] data);
+
+        /// <summary>
+        /// Send a TearOff message for the respective NetworkObject to all relevant targets
+        /// </summary>
+        /// <param name="obj"></param>
+        void TearOffObject(NetworkObject obj);
     }
 }
