@@ -353,5 +353,10 @@ namespace ULS.Core
             IsLinked = false;
             Owner?.TearOffObject(this);
         }
+
+        public override string ToString()
+        {
+            return $"{this.GetType().Name} (ID: {UniqueId})";
+        }
     }
 }
