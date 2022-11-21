@@ -384,6 +384,27 @@ namespace ULS.CodeGen
             return null;
         }
 
+        private static string? FindGeneratedImplementationFileForClass(string unrealModuleBaseDir, string className)
+        {
+            string baseFn = GetBaseFilenameForClass(className) + ".gen.cpp";
+            if (File.Exists(Path.Combine(unrealModuleBaseDir, baseFn)))
+            {
+                return Path.Combine(unrealModuleBaseDir, baseFn);
+            }
+
+            string[] files = Directory.GetFiles(Path.Combine(unrealModuleBaseDir), "*.cpp", SearchOption.AllDirectories);
+            for (int i = 0; i < files.Length; i++)
+            {
+                string fn = Path.GetFileName(files[i]);
+                if (string.Equals(fn, baseFn, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    return files[i];
+                }
+            }
+
+            return null;
+        }
+
         private static string? GetBaseFilenameForClass(string className)
         {
             if (className.Length < 2)
