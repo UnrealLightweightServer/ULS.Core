@@ -596,9 +596,9 @@ namespace ULS.CodeGen
                             {
                                 case "CallStrategy":
                                     {
-                                        if (attrData.Value.Value is CallStrategy strat)
+                                        if (attrData.Value.Value != null)
                                         {
-                                            callStrategyToUse = strat;
+                                            callStrategyToUse = (CallStrategy)attrData.Value.Value;
                                         }
                                     }
                                     break;

@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
+using System.IO;
 using System.Text;
 using ULS.Core;
 
@@ -743,9 +744,9 @@ public partial class ULSGenerator : IIncrementalGenerator
                         {
                             case "CallStrategy":
                                 {
-                                    if (attrData.Value.Value is CallStrategy strat)
+                                    if (attrData.Value.Value != null)
                                     {
-                                        callStrategyToUse = strat;
+                                        callStrategyToUse = (CallStrategy)attrData.Value.Value;
                                     }
                                 }
                                 break;
