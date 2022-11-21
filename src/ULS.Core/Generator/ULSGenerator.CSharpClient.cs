@@ -8,19 +8,19 @@ namespace ULS.CodeGen
 {
     public partial class ULSGenerator
     {
-        private void GenerateCSharpClientClasses(GeneratorExecutionContext context, SyntaxReceiver receiver)
+        private void GenerateCSharpClientClasses(SourceProductionContext context, IGeneratorContextProvider generatorContext)
         {
-            if (receiver.CSharpClientTypes.Count == 0)
+            if (generatorContext.CSharpClientTypes.Count == 0)
             {
                 return;
             }            
 
             List<IEventSymbol> events = new List<IEventSymbol>();
-            foreach (var pair in receiver.RpcEventsByType)
+            foreach (var pair in generatorContext.RpcEventsByType)
             {
                 string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__client_methods.g.cs";
 
-                string? code = GenerateCSharpClientEvents(context, pair.Key, pair.Value, receiver.RpcEventParameterNameLookup);
+                string? code = GenerateCSharpClientEvents(context, pair.Key, pair.Value, generatorContext.RpcEventParameterNameLookup);
                 if (code == null)
                 {
                     // TODO: Add warning
@@ -30,7 +30,7 @@ namespace ULS.CodeGen
             }
 
             List<IMethodSymbol> methods = new List<IMethodSymbol>();
-            foreach (var pair in receiver.RpcMethodsByType)
+            foreach (var pair in generatorContext.RpcMethodsByType)
             {
                 string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__client_events.g.cs";
 
@@ -44,7 +44,7 @@ namespace ULS.CodeGen
             }
         }
 
-        private string GenerateClientProcessRpc(GeneratorExecutionContext context, string methodName, IMethodSymbol item, string baseIndent = "")
+        private string GenerateClientProcessRpc(SourceProductionContext context, string methodName, IMethodSymbol item, string baseIndent = "")
         {
             StringBuilder sb = new StringBuilder();
 
@@ -79,7 +79,7 @@ namespace ULS.CodeGen
             return sb.ToString();
         }
 
-        private string? GenerateCSharpClientEventHandlers(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> methods)
+        private string? GenerateCSharpClientEventHandlers(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> methods)
         {
             StringBuilder sb = new StringBuilder();
             sb.AppendLine($"using System.Text;");
@@ -149,7 +149,7 @@ namespace ULS.CodeGen
             return sb.ToString();
         }
 
-        private string? GenerateCSharpClientEvents(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> events,
+        private string? GenerateCSharpClientEvents(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> events,
             Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             StringBuilder sb = new StringBuilder();

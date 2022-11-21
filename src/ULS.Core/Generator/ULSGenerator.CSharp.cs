@@ -9,28 +9,28 @@ namespace ULS.CodeGen
 {
     public partial class ULSGenerator
     {
-        private bool GenerateCSharpClasses(GeneratorExecutionContext context, SyntaxReceiver receiver)
+        private bool GenerateCSharpClasses(SourceProductionContext context, IGeneratorContextProvider generatorContext)
         {
-            if (ValidateReplicationTypes(context, receiver) == false)
+            if (ValidateReplicationTypes(context, generatorContext) == false)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
                     Code_GeneratorFailure, "", "Failed to validate replication types during C# code generation (see previous errors)",
                     "", DiagnosticSeverity.Warning, true), null));
                 return false;
             }
-            if (ValidateRpcCallTypes(context, receiver) == false)
+            if (ValidateRpcCallTypes(context, generatorContext) == false)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
                     Code_GeneratorFailure, "", "Failed to validate rpc call types during C# code generation (see previous errors)",
                     "", DiagnosticSeverity.Warning, true), null));
                 return false;
             }
-            if (ValidateSpawnFunctions(context, receiver) == false)
+            if (ValidateSpawnFunctions(context, generatorContext) == false)
             {
                 return false;
             }
 
-            foreach (var pair in receiver.ReplicationMembers)
+            foreach (var pair in generatorContext.ReplicationMembers)
             {
                 string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__server_properties.g.cs";
 
@@ -43,7 +43,7 @@ namespace ULS.CodeGen
                 context.AddSource(fn, code);
             }
 
-            foreach (var pair in receiver.RpcMethodsByType)
+            foreach (var pair in generatorContext.RpcMethodsByType)
             {
                 string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__server_methods.g.cs";
 
@@ -63,18 +63,18 @@ namespace ULS.CodeGen
                 context.AddSource(fn, code);
             }*/
 
-            foreach (var pair in receiver.RpcEventsByType)
+            foreach (var pair in generatorContext.RpcEventsByType)
             {
                 string fn = pair.Key.ToDisplayString().Replace(".", "_") + "__server_events.g.cs";
 
-                string code = GenerateSourceForEvents(context, pair.Key, pair.Value, receiver.RpcEventParameterNameLookup);
+                string code = GenerateSourceForEvents(context, pair.Key, pair.Value, generatorContext.RpcEventParameterNameLookup);
                 context.AddSource(fn, code);
             }
 
             return true;
         }
 
-        private bool ValidateSpawnFunctions(GeneratorExecutionContext context, SyntaxReceiver receiver)
+        private bool ValidateSpawnFunctions(SourceProductionContext context, IGeneratorContextProvider receiver)
         {
             if (receiver.IncorrectSpawnActors.Count == 0 && receiver.IncorrectSpawnObjects.Count == 0)
             {
@@ -105,9 +105,9 @@ namespace ULS.CodeGen
         }
 
         #region Replicated properties
-        private bool ValidateReplicationTypes(GeneratorExecutionContext context, SyntaxReceiver receiver)
+        private bool ValidateReplicationTypes(SourceProductionContext context, IGeneratorContextProvider generatorContext)
         {
-            foreach (var pair in receiver.ReplicationMembers)
+            foreach (var pair in generatorContext.ReplicationMembers)
             {
                 bool isSubC = IsNetworkObject(pair.Key);
                 if (isSubC == false)
@@ -120,13 +120,13 @@ namespace ULS.CodeGen
                 }
             }
 
-            if (receiver.ReplicationMembersNotPartialTypes.Count == 0 &&
-                receiver.ReplicationFieldsNotPrivate.Count == 0)
+            if (generatorContext.ReplicationMembersNotPartialTypes.Count == 0 &&
+                generatorContext.ReplicationFieldsNotPrivate.Count == 0)
             {
                 return true;
             }
 
-            foreach (var item in receiver.ReplicationFieldsNotPrivate)
+            foreach (var item in generatorContext.ReplicationFieldsNotPrivate)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
                     Code_ReplicationTypeNotPrivate, "", "Replicated fields must be a field member, private and start with an underscore.",
@@ -134,7 +134,7 @@ namespace ULS.CodeGen
                     item.Locations.Length > 0 ? item.Locations[0] : null));
             }
 
-            foreach (var item in receiver.ReplicationMembersNotPartialTypes)
+            foreach (var item in generatorContext.ReplicationMembersNotPartialTypes)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
                     Code_ReplicationTypeNotPartial, "", "Classes using Replicated fields must be declared as partial.",
@@ -145,7 +145,7 @@ namespace ULS.CodeGen
             return false;
         }
 
-        private string? GenerateSourceForReplicatedMembers(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IFieldSymbol> members)
+        private string? GenerateSourceForReplicatedMembers(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IFieldSymbol> members)
         {
             bool generateIfChangedCode = false;
 
@@ -357,7 +357,7 @@ namespace ULS.CodeGen
             return $"default({symbolType})";
         }
 
-        private static string? GetDeserializeFunction(GeneratorExecutionContext context, IFieldSymbol field)
+        private static string? GetDeserializeFunction(SourceProductionContext context, IFieldSymbol field)
         {
             ITypeSymbol symbolType = field.Type;
             switch (symbolType.ToString())
@@ -398,7 +398,7 @@ namespace ULS.CodeGen
             return null;
         }
 
-        private static string? GetSerializeFunction(GeneratorExecutionContext context, IFieldSymbol field)
+        private static string? GetSerializeFunction(SourceProductionContext context, IFieldSymbol field)
         {
             ITypeSymbol symbolType = field.Type;
             string symbolName = GetReplicationFieldReplicationName(field);
@@ -437,7 +437,7 @@ namespace ULS.CodeGen
         #endregion
 
         #region Events
-        private string GenerateProcessRpc(GeneratorExecutionContext context,  string methodName, IMethodSymbol item, IEventSymbol eItem,
+        private string GenerateProcessRpc(SourceProductionContext context,  string methodName, IMethodSymbol item, IEventSymbol eItem,
             Dictionary<IEventSymbol, string[]> eventParameterNameLookup, string baseIndent = "")
         {
             StringBuilder sb = new StringBuilder();
@@ -475,7 +475,7 @@ namespace ULS.CodeGen
             return sb.ToString();
         }
 
-        private string GenerateSourceForEvents(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> items,
+        private string GenerateSourceForEvents(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> items,
             Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             StringBuilder sb = new StringBuilder();
@@ -529,15 +529,15 @@ namespace ULS.CodeGen
         #endregion
 
         #region RPC calls
-        private bool ValidateRpcCallTypes(GeneratorExecutionContext context, SyntaxReceiver receiver)
+        private bool ValidateRpcCallTypes(SourceProductionContext context, IGeneratorContextProvider generatorContext)
         {
-            if (receiver.RpcCallsNoNetworkObject.Count == 0 &&
-                receiver.RpcCallNotPartialTypes.Count == 0)
+            if (generatorContext.RpcCallsNoNetworkObject.Count == 0 &&
+                generatorContext.RpcCallNotPartialTypes.Count == 0)
             {
                 return true;
             }
 
-            foreach (var item in receiver.RpcCallsNoNetworkObject)
+            foreach (var item in generatorContext.RpcCallsNoNetworkObject)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
                     Code_RpcCallNoNetworkObject, "", "RpcCalls can only be used in classes derived from NetworkObject",
@@ -545,7 +545,7 @@ namespace ULS.CodeGen
                     item.Locations.Length > 0 ? item.Locations[0] : null));
             }
 
-            foreach (var item in receiver.RpcCallNotPartialTypes)
+            foreach (var item in generatorContext.RpcCallNotPartialTypes)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
                     Code_RpcCallNotPartialType, "", "Classes using RpcCalls must be declared as partial",
@@ -556,7 +556,7 @@ namespace ULS.CodeGen
             return false;
         }
 
-        private string? GenerateSourceForMethods(GeneratorExecutionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> items)
+        private string? GenerateSourceForMethods(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> items)
         {
             StringBuilder sb = new StringBuilder();
             sb.AppendLine($"using System.Text;");
@@ -641,7 +641,7 @@ namespace ULS.CodeGen
             return sb.ToString();
         }
 
-        private static string? GetSerializeParameterFunction(GeneratorExecutionContext context, string serializedParamName, IParameterSymbol param)
+        private static string? GetSerializeParameterFunction(SourceProductionContext context, string serializedParamName, IParameterSymbol param)
         {
             ITypeSymbol symbolType = param.Type;
             string symbolName = serializedParamName;
@@ -678,7 +678,7 @@ namespace ULS.CodeGen
             return null;
         }
 
-        private static string? GetDeserializeParameterFunction(GeneratorExecutionContext context, IParameterSymbol param)
+        private static string? GetDeserializeParameterFunction(SourceProductionContext context, IParameterSymbol param)
         {
             ITypeSymbol symbolType = param.Type;
             string symbolName = param.Name;

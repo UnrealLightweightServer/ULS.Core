@@ -10,14 +10,14 @@ namespace ULS.CodeGen
     {
         private string? UnrealModuleBaseDir = null;
 
-        private void GenerateUnrealClasses(GeneratorExecutionContext context, SyntaxReceiver receiver)
+        private void GenerateUnrealClasses(SourceProductionContext context, IGeneratorContextProvider generatorContext)
         {
-            if (ValidateUnrealProjectAttribute(context, receiver) == false)
+            if (ValidateUnrealProjectAttribute(context, generatorContext) == false)
             {
                 return;
             }
 
-            foreach (var item in receiver.UnrealClassTypeLookup)
+            foreach (var item in generatorContext.UnrealClassTypeLookup)
             {
                 string? srcFile = FindImplementationFileForClass(item.Key);
                 string? hdrFile = FindHeaderFileForClass(item.Key);
@@ -33,13 +33,13 @@ namespace ULS.CodeGen
 
                 // Get Methods for this class (Server To Client, Generated code)
                 List<IMethodSymbol> gen_methods = new List<IMethodSymbol>();
-                foreach (var pair in receiver.UnrealGeneratedRpcMethodsByType)
+                foreach (var pair in generatorContext.UnrealGeneratedRpcMethodsByType)
                 {
                     gen_methods.AddRange(pair.Value);
                 }
                 // Get Methods for this class (Server To Client, PartialReflected code)
                 List<IMethodSymbol> refl_methods = new List<IMethodSymbol>();
-                foreach (var pair in receiver.UnrealPartialReflRpcMethodsByType)
+                foreach (var pair in generatorContext.UnrealPartialReflRpcMethodsByType)
                 {
                     refl_methods.AddRange(pair.Value);
                 }
@@ -48,17 +48,17 @@ namespace ULS.CodeGen
 
                 // Get Events for this class (Client To Server)
                 List<IEventSymbol> events = new List<IEventSymbol>();
-                foreach (var pair in receiver.RpcEventsByType)
+                foreach (var pair in generatorContext.RpcEventsByType)
                 {
                     events.AddRange(pair.Value);
                 }
-                GenerateHeaderDataForEvents(context, events, hdrFile, receiver.RpcEventParameterNameLookup);
-                GenerateImplementationDataForEvents(context, events, srcFile, item.Key, receiver.RpcEventParameterNameLookup);
+                GenerateHeaderDataForEvents(context, events, hdrFile, generatorContext.RpcEventParameterNameLookup);
+                GenerateImplementationDataForEvents(context, events, srcFile, item.Key, generatorContext.RpcEventParameterNameLookup);
             }
         }
 
         #region Methods
-        private void GenerateHeaderDataForMethods(GeneratorExecutionContext context, List<IMethodSymbol> methods, string filename)
+        private void GenerateHeaderDataForMethods(SourceProductionContext context, List<IMethodSymbol> methods, string filename)
         {
             string start = "BEGIN_RPC_BP_EVENTS_FROM_SERVER";
             string end = "END_RPC_BP_EVENTS_FROM_SERVER";
@@ -86,7 +86,7 @@ namespace ULS.CodeGen
             ReplaceInFile(filename, code, start, end);
         }
 
-        private void GenerateImplementationDataForMethods(GeneratorExecutionContext context, List<IMethodSymbol> generated_methods, 
+        private void GenerateImplementationDataForMethods(SourceProductionContext context, List<IMethodSymbol> generated_methods, 
             List<IMethodSymbol> reflection_methods, string filename)
         {
             string start = "BEGIN_RPC_BP_EVENTS_FROM_SERVER_CALL";
@@ -194,7 +194,7 @@ namespace ULS.CodeGen
             return "arg" + (index + 1);
         }
 
-        private void GenerateHeaderDataForEvents(GeneratorExecutionContext context, List<IEventSymbol> events, string filename,
+        private void GenerateHeaderDataForEvents(SourceProductionContext context, List<IEventSymbol> events, string filename,
             Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             string start = "BEGIN_RPC_BP_EVENTS_TO_SERVER";
@@ -242,7 +242,7 @@ namespace ULS.CodeGen
             ReplaceInFile(filename, code, start, end);
         }
 
-        private void GenerateImplementationDataForEvents(GeneratorExecutionContext context, List<IEventSymbol> events, string filename,
+        private void GenerateImplementationDataForEvents(SourceProductionContext context, List<IEventSymbol> events, string filename,
             string unrealClassName, Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             string start = "BEGIN_RPC_BP_EVENTS_TO_SERVER_CALL";
@@ -404,7 +404,7 @@ namespace ULS.CodeGen
         #endregion
 
         #region Validation
-        private bool ValidateUnrealProjectAttribute(GeneratorExecutionContext context, SyntaxReceiver receiver)
+        private bool ValidateUnrealProjectAttribute(SourceProductionContext context, IGeneratorContextProvider receiver)
         {
             if (receiver.UnrealProject == null)
             {
