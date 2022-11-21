@@ -9,7 +9,7 @@ namespace ULS.CodeGen
 {
     public partial class ULSGenerator
     {
-        private bool GenerateCSharpClasses(SourceProductionContext context, IGeneratorContextProvider generatorContext)
+        private static bool GenerateCSharpClasses(SourceProductionContext context, IGeneratorContextProvider generatorContext)
         {
             if (ValidateReplicationTypes(context, generatorContext) == false)
             {
@@ -74,7 +74,7 @@ namespace ULS.CodeGen
             return true;
         }
 
-        private bool ValidateSpawnFunctions(SourceProductionContext context, IGeneratorContextProvider receiver)
+        private static bool ValidateSpawnFunctions(SourceProductionContext context, IGeneratorContextProvider receiver)
         {
             if (receiver.IncorrectSpawnActors.Count == 0 && receiver.IncorrectSpawnObjects.Count == 0)
             {
@@ -105,7 +105,7 @@ namespace ULS.CodeGen
         }
 
         #region Replicated properties
-        private bool ValidateReplicationTypes(SourceProductionContext context, IGeneratorContextProvider generatorContext)
+        private static bool ValidateReplicationTypes(SourceProductionContext context, IGeneratorContextProvider generatorContext)
         {
             foreach (var pair in generatorContext.ReplicationMembers)
             {
@@ -145,7 +145,7 @@ namespace ULS.CodeGen
             return false;
         }
 
-        private string? GenerateSourceForReplicatedMembers(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IFieldSymbol> members)
+        private static string? GenerateSourceForReplicatedMembers(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IFieldSymbol> members)
         {
             bool generateIfChangedCode = false;
 
@@ -437,7 +437,7 @@ namespace ULS.CodeGen
         #endregion
 
         #region Events
-        private string GenerateProcessRpc(SourceProductionContext context,  string methodName, IMethodSymbol item, IEventSymbol eItem,
+        private static string GenerateProcessRpc(SourceProductionContext context,  string methodName, IMethodSymbol item, IEventSymbol eItem,
             Dictionary<IEventSymbol, string[]> eventParameterNameLookup, string baseIndent = "")
         {
             StringBuilder sb = new StringBuilder();
@@ -475,7 +475,7 @@ namespace ULS.CodeGen
             return sb.ToString();
         }
 
-        private string GenerateSourceForEvents(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> items,
+        private static string GenerateSourceForEvents(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> items,
             Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             StringBuilder sb = new StringBuilder();
@@ -529,7 +529,7 @@ namespace ULS.CodeGen
         #endregion
 
         #region RPC calls
-        private bool ValidateRpcCallTypes(SourceProductionContext context, IGeneratorContextProvider generatorContext)
+        private static bool ValidateRpcCallTypes(SourceProductionContext context, IGeneratorContextProvider generatorContext)
         {
             if (generatorContext.RpcCallsNoNetworkObject.Count == 0 &&
                 generatorContext.RpcCallNotPartialTypes.Count == 0)
@@ -556,7 +556,7 @@ namespace ULS.CodeGen
             return false;
         }
 
-        private string? GenerateSourceForMethods(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> items)
+        private static string? GenerateSourceForMethods(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> items)
         {
             StringBuilder sb = new StringBuilder();
             sb.AppendLine($"using System.Text;");
@@ -720,7 +720,7 @@ namespace ULS.CodeGen
             return null;
         }
 
-        private string GetReturnType(IMethodSymbol ms)
+        private static string GetReturnType(IMethodSymbol ms)
         {
             if (ms.ReturnsVoid)
             {

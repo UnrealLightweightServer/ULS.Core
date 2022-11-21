@@ -10,17 +10,17 @@ namespace ULS.CodeGen
     {
         private string? UnrealModuleBaseDir = null;
 
-        private void GenerateUnrealClasses(SourceProductionContext context, IGeneratorContextProvider generatorContext)
+        private static void GenerateUnrealClasses(SourceProductionContext context, IGeneratorContextProvider generatorContext)
         {
-            if (ValidateUnrealProjectAttribute(context, generatorContext) == false)
+            if (ValidateUnrealProjectAttribute(context, generatorContext, out var unrealModuleBaseDir) == false)
             {
                 return;
             }
 
             foreach (var item in generatorContext.UnrealClassTypeLookup)
             {
-                string? srcFile = FindImplementationFileForClass(item.Key);
-                string? hdrFile = FindHeaderFileForClass(item.Key);
+                string? srcFile = FindImplementationFileForClass(unrealModuleBaseDir, item.Key);
+                string? hdrFile = FindHeaderFileForClass(unrealModuleBaseDir, item.Key);
 
                 if (srcFile == null || hdrFile == null)
                 {
@@ -58,7 +58,7 @@ namespace ULS.CodeGen
         }
 
         #region Methods
-        private void GenerateHeaderDataForMethods(SourceProductionContext context, List<IMethodSymbol> methods, string filename)
+        private static void GenerateHeaderDataForMethods(SourceProductionContext context, List<IMethodSymbol> methods, string filename)
         {
             string start = "BEGIN_RPC_BP_EVENTS_FROM_SERVER";
             string end = "END_RPC_BP_EVENTS_FROM_SERVER";
@@ -86,7 +86,7 @@ namespace ULS.CodeGen
             ReplaceInFile(filename, code, start, end);
         }
 
-        private void GenerateImplementationDataForMethods(SourceProductionContext context, List<IMethodSymbol> generated_methods, 
+        private static void GenerateImplementationDataForMethods(SourceProductionContext context, List<IMethodSymbol> generated_methods, 
             List<IMethodSymbol> reflection_methods, string filename)
         {
             string start = "BEGIN_RPC_BP_EVENTS_FROM_SERVER_CALL";
@@ -160,7 +160,7 @@ namespace ULS.CodeGen
         }
         #endregion
 
-        private string GetEventName(IEventSymbol symbol)
+        private static string GetEventName(IEventSymbol symbol)
         {
             string name = symbol.Name;
             if (name.StartsWith("OnHandle"))
@@ -170,7 +170,7 @@ namespace ULS.CodeGen
             return name;
         }
 
-        private bool HasEventParameterName(IEventSymbol symbol, int index, Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
+        private static bool HasEventParameterName(IEventSymbol symbol, int index, Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             if (eventParameterNameLookup.TryGetValue(symbol, out var names))
             {
@@ -182,7 +182,7 @@ namespace ULS.CodeGen
             return false;
         }
 
-        private string GetEventParameterName(IEventSymbol symbol, int index, Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
+        private static string GetEventParameterName(IEventSymbol symbol, int index, Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             if (eventParameterNameLookup.TryGetValue(symbol, out var names))
             {
@@ -194,7 +194,7 @@ namespace ULS.CodeGen
             return "arg" + (index + 1);
         }
 
-        private void GenerateHeaderDataForEvents(SourceProductionContext context, List<IEventSymbol> events, string filename,
+        private static void GenerateHeaderDataForEvents(SourceProductionContext context, List<IEventSymbol> events, string filename,
             Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             string start = "BEGIN_RPC_BP_EVENTS_TO_SERVER";
@@ -242,7 +242,7 @@ namespace ULS.CodeGen
             ReplaceInFile(filename, code, start, end);
         }
 
-        private void GenerateImplementationDataForEvents(SourceProductionContext context, List<IEventSymbol> events, string filename,
+        private static void GenerateImplementationDataForEvents(SourceProductionContext context, List<IEventSymbol> events, string filename,
             string unrealClassName, Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             string start = "BEGIN_RPC_BP_EVENTS_TO_SERVER_CALL";
@@ -330,7 +330,7 @@ namespace ULS.CodeGen
         }
 
         #region File Utils
-        private void ReplaceInFile(string filename, string content, string start, string end)
+        private static void ReplaceInFile(string filename, string content, string start, string end)
         {
             string contents = File.ReadAllText(filename);
 
@@ -344,15 +344,15 @@ namespace ULS.CodeGen
             File.WriteAllText(filename, contents);
         }
 
-        private string? FindHeaderFileForClass(string className)
+        private static string? FindHeaderFileForClass(string unrealModuleBaseDir, string className)
         {
             string baseFn = GetBaseFilenameForClass(className) + ".h";
-            if (File.Exists(Path.Combine(UnrealModuleBaseDir, baseFn)))
+            if (File.Exists(Path.Combine(unrealModuleBaseDir, baseFn)))
             {
-                return Path.Combine(UnrealModuleBaseDir, baseFn);
+                return Path.Combine(unrealModuleBaseDir, baseFn);
             }
 
-            string[] files = Directory.GetFiles(Path.Combine(UnrealModuleBaseDir), "*.h", SearchOption.AllDirectories);
+            string[] files = Directory.GetFiles(Path.Combine(unrealModuleBaseDir), "*.h", SearchOption.AllDirectories);
             for (int i = 0; i < files.Length; i++)
             {
                 string fn = Path.GetFileName(files[i]);
@@ -365,15 +365,15 @@ namespace ULS.CodeGen
             return null;
         }
 
-        private string? FindImplementationFileForClass(string className)
+        private static string? FindImplementationFileForClass(string unrealModuleBaseDir, string className)
         {
             string baseFn = GetBaseFilenameForClass(className) + ".cpp";
-            if (File.Exists(Path.Combine(UnrealModuleBaseDir, baseFn)))
+            if (File.Exists(Path.Combine(unrealModuleBaseDir, baseFn)))
             {
-                return Path.Combine(UnrealModuleBaseDir, baseFn);
+                return Path.Combine(unrealModuleBaseDir, baseFn);
             }
 
-            string[] files = Directory.GetFiles(Path.Combine(UnrealModuleBaseDir), "*.cpp", SearchOption.AllDirectories);
+            string[] files = Directory.GetFiles(Path.Combine(unrealModuleBaseDir), "*.cpp", SearchOption.AllDirectories);
             for (int i = 0; i < files.Length; i++)
             {
                 string fn = Path.GetFileName(files[i]);
@@ -386,7 +386,7 @@ namespace ULS.CodeGen
             return null;
         }
 
-        private string? GetBaseFilenameForClass(string className)
+        private static string? GetBaseFilenameForClass(string className)
         {
             if (className.Length < 2)
             {
@@ -404,8 +404,11 @@ namespace ULS.CodeGen
         #endregion
 
         #region Validation
-        private bool ValidateUnrealProjectAttribute(SourceProductionContext context, IGeneratorContextProvider receiver)
+        private static bool ValidateUnrealProjectAttribute(SourceProductionContext context, IGeneratorContextProvider receiver, 
+            out string unrealModuleBaseDir)
         {
+            unrealModuleBaseDir = string.Empty;
+
             if (receiver.UnrealProject == null)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
@@ -434,15 +437,15 @@ namespace ULS.CodeGen
                 return false;
             }
 
-            UnrealModuleBaseDir = Path.Combine(
+            unrealModuleBaseDir = Path.Combine(
                 Path.GetDirectoryName(receiver.UnrealProject.ProjectFile),
                 "Source",
                 receiver.UnrealProject.Module);
 
-            if (Directory.Exists(UnrealModuleBaseDir) == false)
+            if (Directory.Exists(unrealModuleBaseDir) == false)
             {
                 context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor(
-                    Code_UnrealPluginInvalid, "", "Module folder at '" + UnrealModuleBaseDir +
+                    Code_UnrealPluginInvalid, "", "Module folder at '" + unrealModuleBaseDir +
                     "' does not exist or is not readable. Skipping code generation for Unreal. Check the Module field in the UnrealProjectAttribute.",
                     "", DiagnosticSeverity.Error, true),
                     null));
@@ -601,7 +604,7 @@ namespace ULS.CodeGen
             }
         }
 
-        private string GetUnrealReturnType(ITypeSymbol type)
+        private static string GetUnrealReturnType(ITypeSymbol type)
         {
             if (IsNetworkObject(type) == true)
             {
@@ -628,7 +631,7 @@ namespace ULS.CodeGen
             }
         }
 
-        private string GetUnrealParameterType(ITypeSymbol type)
+        private static string GetUnrealParameterType(ITypeSymbol type)
         {
             if (IsNetworkObject(type) == true)
             {
@@ -665,7 +668,7 @@ namespace ULS.CodeGen
             }
         }
 
-        private string GetUnrealParameterDefaultValueType(ITypeSymbol type)
+        private static string GetUnrealParameterDefaultValueType(ITypeSymbol type)
         {
             if (IsNetworkObject(type) == true)
             {

@@ -8,7 +8,7 @@ namespace ULS.CodeGen
 {
     public partial class ULSGenerator
     {
-        private void GenerateCSharpClientClasses(SourceProductionContext context, IGeneratorContextProvider generatorContext)
+        private static void GenerateCSharpClientClasses(SourceProductionContext context, IGeneratorContextProvider generatorContext)
         {
             if (generatorContext.CSharpClientTypes.Count == 0)
             {
@@ -44,7 +44,7 @@ namespace ULS.CodeGen
             }
         }
 
-        private string GenerateClientProcessRpc(SourceProductionContext context, string methodName, IMethodSymbol item, string baseIndent = "")
+        private static string GenerateClientProcessRpc(SourceProductionContext context, string methodName, IMethodSymbol item, string baseIndent = "")
         {
             StringBuilder sb = new StringBuilder();
 
@@ -79,7 +79,7 @@ namespace ULS.CodeGen
             return sb.ToString();
         }
 
-        private string? GenerateCSharpClientEventHandlers(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> methods)
+        private static string? GenerateCSharpClientEventHandlers(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IMethodSymbol> methods)
         {
             StringBuilder sb = new StringBuilder();
             sb.AppendLine($"using System.Text;");
@@ -149,7 +149,7 @@ namespace ULS.CodeGen
             return sb.ToString();
         }
 
-        private string? GenerateCSharpClientEvents(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> events,
+        private static string? GenerateCSharpClientEvents(SourceProductionContext context, INamedTypeSymbol typeSymbol, List<IEventSymbol> events,
             Dictionary<IEventSymbol, string[]> eventParameterNameLookup)
         {
             StringBuilder sb = new StringBuilder();
