@@ -8,8 +8,6 @@ namespace ULS.CodeGen
 {
     public partial class ULSGenerator
     {
-        private string? UnrealModuleBaseDir = null;
-
         private static void GenerateUnrealClasses(SourceProductionContext context, IGeneratorContextProvider generatorContext)
         {
             if (ValidateUnrealProjectAttribute(context, generatorContext, out var unrealModuleBaseDir) == false)

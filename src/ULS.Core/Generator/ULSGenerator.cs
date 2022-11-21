@@ -191,7 +191,7 @@ public partial class ULSGenerator : IIncrementalGenerator
         }
         catch (Exception ex)
         {
-            //Log("EXCEPTION VISIT: " + ex);
+            Log("GetSemanticTargetForGeneration Exception: " + ex);
         }
 
         return null;
@@ -452,6 +452,7 @@ public partial class ULSGenerator : IIncrementalGenerator
         public List<InvocationExpressionSyntax> IncorrectSpawnActors { get; } = new List<InvocationExpressionSyntax>();
         public List<InvocationExpressionSyntax> IncorrectSpawnObjects { get; } = new List<InvocationExpressionSyntax>();
 
+#pragma warning disable RS1024 // Symbols should be compared for equality
         public Dictionary<INamedTypeSymbol, List<IFieldSymbol>> ReplicationMembers { get; } = new Dictionary<INamedTypeSymbol, List<IFieldSymbol>>();
 
         public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> RpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
@@ -459,6 +460,7 @@ public partial class ULSGenerator : IIncrementalGenerator
         public Dictionary<INamedTypeSymbol, List<IMethodSymbol>> UnrealPartialReflRpcMethodsByType { get; } = new Dictionary<INamedTypeSymbol, List<IMethodSymbol>>();
         public Dictionary<INamedTypeSymbol, List<IEventSymbol>> RpcEventsByType { get; } = new Dictionary<INamedTypeSymbol, List<IEventSymbol>>();
         public Dictionary<IEventSymbol, string[]> RpcEventParameterNameLookup { get; } = new Dictionary<IEventSymbol, string[]>();
+#pragma warning restore RS1024 // Symbols should be compared for equality
 
         public Dictionary<string, List<INamedTypeSymbol>> UnrealClassTypeLookup { get; } = new Dictionary<string, List<INamedTypeSymbol>>();
 
@@ -601,16 +603,16 @@ public partial class ULSGenerator : IIncrementalGenerator
                         switch (attrData.Key)
                         {
                             case "IsCodeGenerationEnabled":
-                                UnrealProject.IsCodeGenerationEnabled = (bool)attrData.Value.Value;
+                                UnrealProject.IsCodeGenerationEnabled = attrData.Value.Value != null ? (bool)attrData.Value.Value : false;
                                 break;
                             case "ProjectName":
-                                UnrealProject.ProjectName = (string)attrData.Value.Value;
+                                UnrealProject.ProjectName = attrData.Value.Value != null ? (string)attrData.Value.Value : string.Empty;
                                 break;
                             case "ProjectFile":
-                                UnrealProject.ProjectFile = (string)attrData.Value.Value;
+                                UnrealProject.ProjectFile = attrData.Value.Value != null ? (string)attrData.Value.Value : string.Empty;
                                 break;
                             case "Module":
-                                UnrealProject.Module = (string)attrData.Value.Value;
+                                UnrealProject.Module = attrData.Value.Value != null ? (string)attrData.Value.Value : string.Empty;
                                 break;
                         }
                     }
@@ -630,13 +632,16 @@ public partial class ULSGenerator : IIncrementalGenerator
                         }
                     }
 
-                    List<INamedTypeSymbol> list;
-                    if (UnrealClassTypeLookup.TryGetValue(unrealClass, out list) == false)
+                    if (unrealClass != null)
                     {
-                        list = new List<INamedTypeSymbol>();
-                        UnrealClassTypeLookup[unrealClass] = list;
+                        List<INamedTypeSymbol> list;
+                        if (UnrealClassTypeLookup.TryGetValue(unrealClass, out list) == false)
+                        {
+                            list = new List<INamedTypeSymbol>();
+                            UnrealClassTypeLookup[unrealClass] = list;
+                        }
+                        list.Add(ts);
                     }
-                    list.Add(ts);
                 }
 
                 if (attr.AttributeClass != null &&
@@ -669,7 +674,8 @@ public partial class ULSGenerator : IIncrementalGenerator
                                             string[] values = new string[attrData.Value.Values.Length];
                                             for (int i = 0; i < values.Length; i++)
                                             {
-                                                values[i] = (string)attrData.Value.Values[i].Value;
+                                                var val = attrData.Value.Values[i].Value;
+                                                values[i] = val != null ? (string)val : string.Empty;
                                             }
                                             RpcEventParameterNameLookup[es] = values;
                                         }
@@ -737,7 +743,10 @@ public partial class ULSGenerator : IIncrementalGenerator
                         {
                             case "CallStrategy":
                                 {
-                                    callStrategyToUse = (CallStrategy)attrData.Value.Value;
+                                    if (attrData.Value.Value is CallStrategy strat)
+                                    {
+                                        callStrategyToUse = strat;
+                                    }
                                 }
                                 break;
                         }

@@ -291,18 +291,20 @@ namespace ULS.CodeGen
                         {
                             case "ReplicationStrategy":
                                 {
-                                    var strat = (ReplicationStrategy)attrData.Value.Value;
-                                    switch (strat)
+                                    if (attrData.Value.Value is ReplicationStrategy strat)
                                     {
-                                        case ReplicationStrategy.Automatic:
-                                            isImmediate = IsNetworkObject(field.Type);
-                                            break;
-                                        case ReplicationStrategy.Manual:
-                                            isImmediate = false;
-                                            break;
-                                        case ReplicationStrategy.Immediate:
-                                            isImmediate = true;
-                                            break;
+                                        switch (strat)
+                                        {
+                                            case ReplicationStrategy.Automatic:
+                                                isImmediate = IsNetworkObject(field.Type);
+                                                break;
+                                            case ReplicationStrategy.Manual:
+                                                isImmediate = false;
+                                                break;
+                                            case ReplicationStrategy.Immediate:
+                                                isImmediate = true;
+                                                break;
+                                        }
                                     }
                                 }
                                 break;
@@ -594,7 +596,10 @@ namespace ULS.CodeGen
                             {
                                 case "CallStrategy":
                                     {
-                                        callStrategyToUse = (CallStrategy)attrData.Value.Value;
+                                        if (attrData.Value.Value is CallStrategy strat)
+                                        {
+                                            callStrategyToUse = strat;
+                                        }
                                     }
                                     break;
                             }

@@ -135,7 +135,7 @@ namespace ULS.Core
             // Base implementation does nothing            
         }
 
-        protected void SerializeRef(BinaryWriter writer, NetworkObject otherActor, string fieldName)
+        protected void SerializeRef(BinaryWriter writer, NetworkObject? otherActor, string fieldName)
         {
             writer.Write((byte)ReplicatedFieldType.Reference);      // Ref
             writer.Write(Encoding.ASCII.GetByteCount(fieldName));
